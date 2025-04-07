@@ -7,8 +7,8 @@ class Manager :
 public:
 	void parseINI();
 	void handleCameraState(RE::MapCamera* const cameraState);
-	void setisShowingQuest(const bool val) noexcept { m_isShowingQuest = val; }
-	bool allowHidingPlayerMarker() const noexcept { return m_allowHidePlayerMarker; }
+	void setIsShowingQuest(const bool val) noexcept { m_isShowingQuest = val; }
+	bool isPlayerMarkerHidden() const noexcept { return m_isPlayerMarkerHidden; }
 
 	void draw();
 
@@ -27,7 +27,7 @@ private:
 
 	// INI
 	RE::TESObjectREFR* m_marker{ nullptr };
-	bool m_allowHidePlayerMarker{ true };
+	bool m_isPlayerMarkerHidden{ true };
 
 	bool m_mapOpen{ false };
 	bool m_isShowingQuest{ false };

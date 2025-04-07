@@ -12,7 +12,7 @@ void Manager::parseINI()
 
 	constexpr const char* section = "General";
 
-	m_allowHidePlayerMarker = ini.GetBoolValue(section, "HidePlayerMapMarker");
+	m_isPlayerMarkerHidden = ini.GetBoolValue(section, "HidePlayerMapMarker");
 	const auto marker = ini.GetValue(section, "MapMarkerReference");
 	if (!marker || *marker == '\0')
 		return;
@@ -40,7 +40,7 @@ void Manager::serializeINI()
 
 	constexpr const char* section = "General";
 
-	ini.SetBoolValue(section, "HidePlayerMapMarker", m_allowHidePlayerMarker);
+	ini.SetBoolValue(section, "HidePlayerMapMarker", m_isPlayerMarkerHidden);
 
 	const auto file = m_marker->GetFile(0);
 	std::string_view filename = file ? file->GetFilename() : ""sv;
@@ -160,7 +160,7 @@ void Manager::draw()
 {
 	bool valueChanged = false;
 
-	if (ImGui::Checkbox("Hide Player Marker", &m_allowHidePlayerMarker))
+	if (ImGui::Checkbox("Hide Player Marker", &m_isPlayerMarkerHidden))
 	{
 		valueChanged = true;
 	}

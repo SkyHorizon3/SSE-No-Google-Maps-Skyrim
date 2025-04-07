@@ -18,12 +18,12 @@ namespace Hooks
 	// disable player map marker
 	struct PlayerMarkerHook
 	{
-		static bool thunk(RE::BSTArray<RE::MapMenuMarker>* player, std::int64_t a2)
+		static bool thunk(RE::BSTArray<RE::MapMenuMarker>* playerMarker, std::int64_t a2)
 		{
-			if (Manager::GetSingleton()->allowHidingPlayerMarker())
+			if (Manager::GetSingleton()->isPlayerMarkerHidden())
 				return false;
 
-			return func(player, a2);
+			return func(playerMarker, a2);
 		};
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
@@ -33,7 +33,7 @@ namespace Hooks
 	{
 		static bool thunk(RE::MapMenu* mapMenu)
 		{
-			if (Manager::GetSingleton()->allowHidingPlayerMarker())
+			if (Manager::GetSingleton()->isPlayerMarkerHidden())
 				return false;
 
 			return func(mapMenu);
@@ -51,7 +51,7 @@ namespace Hooks
 			//RE::FormID formID = (int)*(double*)(*(std::uintptr_t*)(obj + 0x28) + 0x10);
 			//SKSE::log::info("FormID: {0:08X}", formID);
 
-			Manager::GetSingleton()->setisShowingQuest(true);
+			Manager::GetSingleton()->setIsShowingQuest(true);
 
 		};
 		static inline REL::Relocation<decltype(thunk)> func;
