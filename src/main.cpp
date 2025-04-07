@@ -69,7 +69,15 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface*, 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID)
 {
 	if (dwReason == DLL_PROCESS_ATTACH)
+	{
 		g_hModule = hModule;
+	}
+	else if (dwReason == DLL_PROCESS_DETACH)
+	{
+		reshade::unregister_overlay(nullptr, &DrawMenu);
+		reshade::unregister_addon(hModule);
+	}
+
 	return TRUE;
 }
 
