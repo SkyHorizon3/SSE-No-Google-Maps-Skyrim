@@ -31,9 +31,12 @@ namespace Hooks
 	// block return to current location
 	struct CurrentLocationReturnHook
 	{
-		static bool thunk(RE::MapMenu*)
+		static bool thunk(RE::MapMenu* mapMenu)
 		{
-			return false;
+			if (Manager::GetSingleton()->allowHidingPlayerMarker())
+				return false;
+
+			return func(mapMenu);
 		};
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
