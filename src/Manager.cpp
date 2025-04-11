@@ -42,9 +42,13 @@ void Manager::serializeINI()
 
 	ini.SetBoolValue(section, "HidePlayerMapMarker", m_isPlayerMarkerHidden);
 
-	const auto file = m_marker->GetFile(0);
-	std::string_view filename = file ? file->GetFilename() : ""sv;
-	const std::string markerString = std::format("{:08X}|{}", Utils::getTrimmedFormID(m_marker), filename);
+	std::string markerString = "None";
+	if (m_marker)
+	{
+		const auto file = m_marker->GetFile(0);
+		std::string_view filename = file ? file->GetFilename() : ""sv;
+		markerString = std::format("{:08X}|{}", Utils::getTrimmedFormID(m_marker), filename);
+	}
 
 	ini.SetValue(section, "MapMarkerReference", markerString.c_str());
 	ini.SaveFile(path.c_str());
@@ -60,16 +64,17 @@ void Manager::handleCameraState(RE::MapCamera* const camera)
 	{
 		if (!m_mapOpen)
 		{
-			float x = 0.f;
-			float y = 0.f;
+			float x = (world->mapData->minimumCoordinates.x + world->mapData->maximumCoordinates.x) / 2;
+			float y = (world->mapData->minimumCoordinates.y + world->mapData->maximumCoordinates.y) / 2;
 
-			if (m_marker && world->mapData)
+			if (m_marker && IsMarkerInPlayerWorldspace(camera->worldSpace))
 			{
 				x = m_marker->GetPositionX();
 				y = m_marker->GetPositionY();
 			}
 
 			world->currentPosition = { x, y, world->currentPosition.z };
+
 			m_mapOpen = true;
 		}
 	}
@@ -79,7 +84,13 @@ void Manager::handleCameraState(RE::MapCamera* const camera)
 		float y = 0.f;
 		world = reinterpret_cast<RE::MapCameraStates::World*>(camera->unk68[0].get());
 
-		if (m_marker && world && world->mapData)
+		if (world)
+		{
+			x = (world->mapData->minimumCoordinates.x + world->mapData->maximumCoordinates.x) / 2;
+			y = (world->mapData->minimumCoordinates.y + world->mapData->maximumCoordinates.y) / 2;
+		}
+
+		if (m_marker && IsMarkerInPlayerWorldspace(camera->worldSpace))
 		{
 			x = m_marker->GetPositionX();
 			y = m_marker->GetPositionY();
@@ -158,6 +169,7 @@ RE::MapCameraStates::Exit* Manager::asExit(RE::TESCameraState* state)
 
 void Manager::draw()
 {
+	static std::string selected{};
 	bool valueChanged = false;
 
 	if (ImGui::Checkbox("Hide Player Marker", &m_isPlayerMarkerHidden))
@@ -165,18 +177,29 @@ void Manager::draw()
 		valueChanged = true;
 	}
 
-	static std::string selected = constructKey(m_marker);
+	if (!m_marker)
+		selected = "None";
+	else
+		selected = constructKey(m_marker);
+
 	if (createCombo("Select Marker", selected, m_mapMarkers, ImGuiComboFlags_None))
 	{
 		valueChanged = true;
 
 		const size_t firstSep = selected.find('|');
-		const auto first = selected.substr(0, firstSep);
+		if (firstSep == std::string::npos)
+		{
+			m_marker = nullptr;
+		}
+		else
+		{
+			const auto first = selected.substr(0, firstSep);
 
-		const size_t secondSep = selected.find('|', firstSep + 1);
-		const auto second = selected.substr(firstSep + 1, secondSep - firstSep - 1);
+			const size_t secondSep = selected.find('|', firstSep + 1);
+			const auto second = selected.substr(firstSep + 1, secondSep - firstSep - 1);
 
-		m_marker = RE::TESDataHandler::GetSingleton()->LookupForm<RE::TESObjectREFR>(std::stoul(first, nullptr, 16), second);
+			m_marker = RE::TESDataHandler::GetSingleton()->LookupForm<RE::TESObjectREFR>(std::stoul(first, nullptr, 16), second);
+		}
 	}
 
 	if (valueChanged)
@@ -213,6 +236,8 @@ std::vector<std::string> Manager::enumerateMapMarkers() const
 	if (!map)
 		return markerVec;
 
+	markerVec.emplace_back("None");
+
 	for (const auto& [formID, form] : *map)
 	{
 		if (!form || form->IsNot(RE::FormType::Reference))
@@ -230,6 +255,23 @@ std::vector<std::string> Manager::enumerateMapMarkers() const
 	}
 
 	return markerVec;
+}
+
+bool Manager::IsMarkerInPlayerWorldspace(const RE::TESWorldSpace* cameraWorldpspace) const
+{
+	if (!m_marker || !cameraWorldpspace)
+		return false;
+
+	auto markerWs = m_marker->GetWorldspace();
+	if (!markerWs)
+		return false;
+
+	while (markerWs->parentWorld)
+	{
+		markerWs = markerWs->parentWorld;
+	}
+
+	return cameraWorldpspace == markerWs;
 }
 
 bool Manager::createCombo(const char* label, std::string& currentItem, std::vector<std::string>& items, ImGuiComboFlags_ flags)
@@ -269,5 +311,3 @@ bool Manager::createCombo(const char* label, std::string& currentItem, std::vect
 
 	return itemChanged;
 }
-
-

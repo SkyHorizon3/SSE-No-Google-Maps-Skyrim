@@ -20,6 +20,7 @@ private:
 
 	std::string constructKey(const RE::TESObjectREFR* ref) const;
 	std::vector<std::string> enumerateMapMarkers() const;
+	bool IsMarkerInPlayerWorldspace(const RE::TESWorldSpace* cameraWorldpspace) const;
 
 	bool createCombo(const char* label, std::string& currentItem, std::vector<std::string>& items, ImGuiComboFlags_ flags);
 
