@@ -143,9 +143,12 @@ namespace Hooks
 	// hide compass markers
 	struct CompassHook01
 	{
-		static bool thunk(void*, RE::NiPoint3*, const RE::RefHandle&, std::uint32_t)
+		static bool thunk(void* unk, void* someScaleformInformation, RE::NiPoint3* pos, const RE::RefHandle& handle, std::uint32_t markerGotoFrame)
 		{
-			return false;
+			if (Manager::GetSingleton()->areCompassMarkersHidden())
+				return false;
+
+			return func(unk, someScaleformInformation, pos, handle, markerGotoFrame);
 		}
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
@@ -153,9 +156,12 @@ namespace Hooks
 	// hide quest target marker. Only show when player is in area
 	struct CompassHook02
 	{
-		static bool thunk(void*, RE::NiPoint3*, const RE::RefHandle&, std::uint32_t)
+		static bool thunk(void* unk, void* someScaleformInformation, RE::NiPoint3* pos, const RE::RefHandle& handle, std::uint32_t markerGotoFrame)
 		{
-			return false;
+			if (Manager::GetSingleton()->isCompassQuestTargetHidden())
+				return false;
+
+			return func(unk, someScaleformInformation, pos, handle, markerGotoFrame);
 		}
 		static inline REL::Relocation<decltype(thunk)> func;
 	};

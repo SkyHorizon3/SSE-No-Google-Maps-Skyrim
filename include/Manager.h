@@ -5,6 +5,8 @@ class Manager : public REX::Singleton<Manager>
 public:
 	void parseINI();
 	bool isPlayerMarkerHidden() const noexcept { return m_isPlayerMarkerHidden; }
+	bool areCompassMarkersHidden() const noexcept { return m_hideCompassMapMarkers; }
+	bool isCompassQuestTargetHidden() const noexcept { return m_hideCompassQuestTargetMarker; }
 
 	RE::RefHandle getMarkerRefHandle(const RE::PlayerCharacter* player);
 	RE::TESObjectREFR* getMarkerReference() const { return m_marker; }
@@ -26,6 +28,8 @@ private:
 	// INI
 	RE::TESObjectREFR* m_marker{ nullptr };
 	bool m_isPlayerMarkerHidden{ true };
+	bool m_hideCompassMapMarkers{ true };
+	bool m_hideCompassQuestTargetMarker{ true };
 
 	std::vector<std::string> m_mapMarkers{};
 

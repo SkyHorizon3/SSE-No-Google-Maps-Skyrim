@@ -13,6 +13,9 @@ void Manager::parseINI()
 	constexpr const char* section = "General";
 
 	m_isPlayerMarkerHidden = ini.GetBoolValue(section, "HidePlayerMapMarker");
+	m_hideCompassMapMarkers = ini.GetBoolValue(section, "HideCompassMapMarkers");
+	m_hideCompassQuestTargetMarker = ini.GetBoolValue(section, "HideCompassQuestTargetMarker");
+
 	const auto marker = ini.GetValue(section, "MapMarkerReference");
 	if (!marker || *marker == '\0')
 		return;
@@ -41,6 +44,8 @@ void Manager::serializeINI()
 	constexpr const char* section = "General";
 
 	ini.SetBoolValue(section, "HidePlayerMapMarker", m_isPlayerMarkerHidden);
+	ini.SetBoolValue(section, "HideCompassMapMarkers", m_hideCompassMapMarkers);
+	ini.SetBoolValue(section, "HideCompassQuestTargetMarker", m_hideCompassQuestTargetMarker);
 
 	std::string markerString = "None";
 	if (m_marker)
@@ -60,6 +65,14 @@ void Manager::draw()
 	bool valueChanged = false;
 
 	if (ImGui::Checkbox("Hide Player Marker", &m_isPlayerMarkerHidden))
+	{
+		valueChanged = true;
+	}
+	if (ImGui::Checkbox("Hide Compass Map Markers", &m_hideCompassMapMarkers))
+	{
+		valueChanged = true;
+	}
+	if (ImGui::Checkbox("Hide Compass Quest Target Marker", &m_hideCompassQuestTargetMarker))
 	{
 		valueChanged = true;
 	}
