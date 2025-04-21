@@ -1,26 +1,23 @@
 #pragma once
 
-class Manager :
-	public REX::Singleton<Manager>,
-	public RE::BSTEventSink<RE::MenuOpenCloseEvent>
+class Manager : public REX::Singleton<Manager>
 {
 public:
 	void parseINI();
-	void handleCameraState(RE::MapCamera* const cameraState);
-	void setIsShowingQuest(const bool val) noexcept { m_isShowingQuest = val; }
 	bool isPlayerMarkerHidden() const noexcept { return m_isPlayerMarkerHidden; }
+
+	RE::RefHandle getMarkerRefHandle(const RE::PlayerCharacter* player);
+	RE::TESObjectREFR* getMarkerReference() const { return m_marker; }
+	bool isParentInteriorCell(const RE::TESObjectREFR* ref);
 
 	void draw();
 
-	RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) override;
 private:
-	RE::MapCameraStates::World* asWorld(RE::TESCameraState* state);
-	RE::MapCameraStates::Transition* asTransition(RE::TESCameraState* state);
-	//RE::MapCameraStates::Exit* asExit(RE::TESCameraState* state);
-
 	std::string constructKey(const RE::TESObjectREFR* ref) const;
 	std::vector<std::string> enumerateMapMarkers() const;
-	bool IsMarkerInPlayerWorldspace(const RE::TESWorldSpace* cameraWorldpspace) const;
+
+
+	const RE::TESWorldSpace* getRootWorldSpace(const RE::TESWorldSpace* ws);
 
 	bool createCombo(const char* label, std::string& currentItem, std::vector<std::string>& items, ImGuiComboFlags_ flags);
 
@@ -30,8 +27,6 @@ private:
 	RE::TESObjectREFR* m_marker{ nullptr };
 	bool m_isPlayerMarkerHidden{ true };
 
-	bool m_mapOpen{ false };
-	bool m_isShowingQuest{ false };
 	std::vector<std::string> m_mapMarkers{};
 
 };

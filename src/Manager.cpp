@@ -54,119 +54,6 @@ void Manager::serializeINI()
 	ini.SaveFile(path.c_str());
 }
 
-void Manager::handleCameraState(RE::MapCamera* const camera)
-{
-	const auto cameraState = camera->currentState.get();
-	if (m_isShowingQuest || !cameraState)
-		return;
-
-	if (auto* world = asWorld(cameraState))
-	{
-		if (!m_mapOpen)
-		{
-			float x = (world->mapData->minimumCoordinates.x + world->mapData->maximumCoordinates.x) / 2;
-			float y = (world->mapData->minimumCoordinates.y + world->mapData->maximumCoordinates.y) / 2;
-
-			if (m_marker && IsMarkerInPlayerWorldspace(camera->worldSpace))
-			{
-				x = m_marker->GetPositionX();
-				y = m_marker->GetPositionY();
-			}
-
-			world->currentPosition = { x, y, world->currentPosition.z };
-
-			m_mapOpen = true;
-		}
-	}
-	else if (auto* transition = asTransition(cameraState))
-	{
-		float x = 0.f;
-		float y = 0.f;
-		world = reinterpret_cast<RE::MapCameraStates::World*>(camera->unk68[0].get());
-
-		if (world)
-		{
-			x = (world->mapData->minimumCoordinates.x + world->mapData->maximumCoordinates.x) / 2;
-			y = (world->mapData->minimumCoordinates.y + world->mapData->maximumCoordinates.y) / 2;
-		}
-
-		if (m_marker && IsMarkerInPlayerWorldspace(camera->worldSpace))
-		{
-			x = m_marker->GetPositionX();
-			y = m_marker->GetPositionY();
-		}
-
-		if (!m_mapOpen)
-		{
-			transition->zoomDestination = { x, transition->zoomDestination.y + (y - transition->currentPosition.y), transition->zoomDestination.z };
-			transition->zoomOrigin = { x, transition->zoomOrigin.y + (y - transition->currentPosition.y), transition->zoomOrigin.z };
-			transition->currentPosition = { x, y, transition->currentPosition.z };
-
-
-			if (world)
-			{
-				world->currentPosition.x = x;
-				world->currentPosition.y = y;
-			}
-		}
-		else
-		{
-			transition->zoomDestination = { x, y, transition->zoomDestination.z };
-		}
-	}
-
-	/*
-	else if (asExit(cameraState))
-	{
-		m_mapOpen = false;
-		m_isShowingQuest = false;
-	}
-	*/
-}
-
-RE::BSEventNotifyControl Manager::ProcessEvent(const RE::MenuOpenCloseEvent* event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* source)
-{
-	if (!event || !source)
-		return RE::BSEventNotifyControl::kContinue;
-
-	if (event->menuName == RE::MapMenu::MENU_NAME && !event->opening)
-	{
-		m_mapOpen = false;
-		m_isShowingQuest = false;
-	}
-
-	return RE::BSEventNotifyControl::kContinue;
-}
-
-RE::MapCameraStates::World* Manager::asWorld(RE::TESCameraState* state)
-{
-	if (state && *reinterpret_cast<std::uintptr_t*>(state) == RE::MapCameraStates::World::VTABLE[0].address())
-	{
-		return reinterpret_cast<RE::MapCameraStates::World*>(state);
-	}
-	return nullptr;
-}
-
-RE::MapCameraStates::Transition* Manager::asTransition(RE::TESCameraState* state)
-{
-	if (state && *reinterpret_cast<std::uintptr_t*>(state) == RE::MapCameraStates::Transition::VTABLE[0].address())
-	{
-		return reinterpret_cast<RE::MapCameraStates::Transition*>(state);
-	}
-	return nullptr;
-}
-
-/*
-RE::MapCameraStates::Exit* Manager::asExit(RE::TESCameraState* state)
-{
-	if (state && *reinterpret_cast<std::uintptr_t*>(state) == RE::MapCameraStates::Exit::VTABLE[0].address())
-	{
-		return reinterpret_cast<RE::MapCameraStates::Exit*>(state);
-	}
-	return nullptr;
-}
-*/
-
 void Manager::draw()
 {
 	static std::string selected{};
@@ -226,10 +113,57 @@ std::string Manager::constructKey(const RE::TESObjectREFR* ref) const
 	return {};
 }
 
+const RE::TESWorldSpace* Manager::getRootWorldSpace(const RE::TESWorldSpace* ws)
+{
+	while (ws && ws->parentWorld)
+		ws = ws->parentWorld;
+	return ws;
+}
+
+bool Manager::isParentInteriorCell(const RE::TESObjectREFR* ref)
+{
+	if (!ref)
+		return false;
+
+	auto* parentCell = ref->GetParentCell();
+	if (!parentCell)
+	{
+		parentCell = ref->GetSaveParentCell();
+		if (!parentCell)
+		{
+			return false;
+		}
+	}
+
+	return parentCell->IsInteriorCell();
+}
+
+RE::RefHandle Manager::getMarkerRefHandle(const RE::PlayerCharacter* player)
+{
+	if (!m_marker || !player)
+		return 0;
+
+	const auto playerWS = player->GetWorldspace();
+	if (!playerWS)
+		return 0;
+
+	const auto markerWs = m_marker->GetWorldspace();
+	if (!markerWs)
+		return 0;
+
+	if (getRootWorldSpace(markerWs) != getRootWorldSpace(playerWS))
+		return 0;
+
+	RE::RefHandle handle{};
+	RE::CreateRefHandle(handle, m_marker);
+
+	return handle;
+}
+
 std::vector<std::string> Manager::enumerateMapMarkers() const
 {
 	const auto& [map, lock] = RE::TESForm::GetAllForms();
-	[[maybe_unused]] const RE::BSReadWriteLock l{ lock };
+	[[maybe_unused]] const RE::BSReadLockGuard l{ lock };
 
 	std::vector<std::string> markerVec{};
 
@@ -255,23 +189,6 @@ std::vector<std::string> Manager::enumerateMapMarkers() const
 	}
 
 	return markerVec;
-}
-
-bool Manager::IsMarkerInPlayerWorldspace(const RE::TESWorldSpace* cameraWorldpspace) const
-{
-	if (!m_marker || !cameraWorldpspace)
-		return false;
-
-	auto markerWs = m_marker->GetWorldspace();
-	if (!markerWs)
-		return false;
-
-	while (markerWs->parentWorld)
-	{
-		markerWs = markerWs->parentWorld;
-	}
-
-	return cameraWorldpspace == markerWs;
 }
 
 bool Manager::createCombo(const char* label, std::string& currentItem, std::vector<std::string>& items, ImGuiComboFlags_ flags)
