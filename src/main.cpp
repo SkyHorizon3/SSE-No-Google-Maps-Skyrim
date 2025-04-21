@@ -97,12 +97,10 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse)
 
 	SKSE::log::info("Game version: {}", skse->RuntimeVersion());
 
-	/*
 	if (REL::Module::IsVR())
 	{
-		SKSE::stl::report_and_fail("NoGoogleMapsSkyrim does not support VR."sv);
+		SKSE::stl::report_and_fail("No Google Maps Skyrim does not support VR atm."sv);
 	}
-	*/
 
 	Load();
 

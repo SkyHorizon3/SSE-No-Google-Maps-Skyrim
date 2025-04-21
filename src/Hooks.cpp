@@ -10,14 +10,34 @@ namespace Hooks
 	// disable player map marker
 	struct PlayerMarkerHook
 	{
-		static bool thunk(RE::BSTArray<RE::MapMenuMarker>* playerMarker, std::int64_t a2)
+		static bool thunk(RE::BSTArray<RE::MapMenuMarker>* playerMarker, RE::NiPoint3* playerMarkerPos)
 		{
 			if (Manager::GetSingleton()->isPlayerMarkerHidden())
 				return false;
 
-			return func(playerMarker, a2);
+			return func(playerMarker, playerMarkerPos);
 		};
+
+		static bool thunkVR(RE::BSTArray<RE::MapMenuMarker>* playerMarker, RE::NiPoint3* playerMarkerPos, RE::NiPoint3* unk)
+		{
+			if (Manager::GetSingleton()->isPlayerMarkerHidden())
+				return false;
+
+			return funcVR(playerMarker, playerMarkerPos, unk);
+		};
+
 		static inline REL::Relocation<decltype(thunk)> func;
+		static inline REL::Relocation<decltype(thunkVR)> funcVR;
+
+		static void Install()
+		{
+			REL::Relocation<std::uintptr_t> markerHook{ REL::VariantID(52221, 53108, 0x9184C0), REL::Relocate(0x121,0x121,0x124) };
+
+			if (REL::Module::IsVR())
+				funcVR = SKSE::GetTrampoline().write_call<5>(markerHook.address(), thunkVR);
+			else
+				func = SKSE::GetTrampoline().write_call<5>(markerHook.address(), thunk);
+		}
 	};
 
 	// block return to current location
@@ -89,7 +109,7 @@ namespace Hooks
 	{
 		static RE::NiPoint3* thunk(RE::MapCamera* camera, RE::NiPoint3* out, RE::RefHandle& refHandle, RE::TESObjectREFR* ref, RE::MapMenu* menu)
 		{
-			const auto playerHandle = *reinterpret_cast<RE::RefHandle*>(RELOCATION_ID(517013, 0).address());
+			const auto playerHandle = *reinterpret_cast<RE::RefHandle*>(REL::VariantID(517013, 403520, 0x2FEB9EC).address());
 
 			//SKSE::log::info("Handle: {0:08X}", refHandle);
 			if (refHandle == 0 && camera->worldSpace)
@@ -126,15 +146,15 @@ namespace Hooks
 
 		static void Install()
 		{
-			constexpr auto address = RELOCATION_ID(52214, 0);
-			REL::Relocation<std::uintptr_t> fillAddress{ address, REL::Relocate(0x1E5, 0x0) };
+			constexpr auto address = REL::VariantID(52214, 53101, 0x91B360); // Inlined in VR
+			REL::Relocation<std::uintptr_t> fillAddress{ address, REL::Relocate(0x1E5, 0x1E7) };
 
 			auto newCode = Patch();
 			assert(newCode.getSize() == 35);
 
 			REL::safe_write(fillAddress.address(), newCode.getCode(), newCode.getSize());
 
-			REL::Relocation<std::uintptr_t> centerFunc{ address, REL::Relocate(0x220, 0x0) };
+			REL::Relocation<std::uintptr_t> centerFunc{ address, REL::Relocate(0x220, 0x222) };
 			stl::write_thunk_call<MapCameraCenterHook>(centerFunc.address());
 
 		}
@@ -143,6 +163,7 @@ namespace Hooks
 	// hide compass markers
 	struct CompassHook01
 	{
+		// function parameters different in VR
 		static bool thunk(void* unk, void* someScaleformInformation, RE::NiPoint3* pos, const RE::RefHandle& handle, std::uint32_t markerGotoFrame)
 		{
 			if (Manager::GetSingleton()->areCompassMarkersHidden())
@@ -168,28 +189,26 @@ namespace Hooks
 
 	void InstallHooks()
 	{
-		// PlayerMarkerHook
-		REL::Relocation<std::uintptr_t> markerHook{ RELOCATION_ID(52221, 53108), 0x121 };
-		stl::write_thunk_call<PlayerMarkerHook>(markerHook.address());
+		PlayerMarkerHook::Install();
 
 		// CurrentLocationReturnHook
-		REL::Relocation<std::uintptr_t> loc1{ RELOCATION_ID(530215, 53098), 0x7 };
+		REL::Relocation<std::uintptr_t> loc1{ REL::VariantID(530215, 53098, 0x9167F0), 0x7 };
 		stl::write_thunk_jump<CurrentLocationReturnHook>(loc1.address());
 
-		REL::Relocation<std::uintptr_t> loc2{ RELOCATION_ID(52215, 53102), REL::Relocate(0x55D, 0x58F) };
+		REL::Relocation<std::uintptr_t> loc2{ REL::VariantID(52215, 53102, 0x916D10), REL::Relocate(0x55D, 0x58F, 0xA82) };
 		stl::write_thunk_call<CurrentLocationReturnHook>(loc2.address());
 
-		REL::Relocation<std::uintptr_t> loc3{ RELOCATION_ID(52215, 53102), REL::Relocate(0x63B, 0x66D) };
+		REL::Relocation<std::uintptr_t> loc3{ REL::VariantID(52215, 53102, 0x916D10), REL::Relocate(0x63B, 0x66D, 0xC61) };
 		stl::write_thunk_call<CurrentLocationReturnHook>(loc3.address());
 
 		MapMenuProcessMessageHook::Install();
 
 		MapCameraCenterHook::Install();
 
-		REL::Relocation<std::uintptr_t> compass01{ RELOCATION_ID(50870, 51744), REL::Relocate(0x450, 0x473) };
+		REL::Relocation<std::uintptr_t> compass01{ REL::VariantID(50870, 51744, 0x8B4170), REL::Relocate(0x450, 0x473, 0x468) };
 		stl::write_thunk_call<CompassHook01>(compass01.address());
 
-		REL::Relocation<std::uintptr_t> compass02{ RELOCATION_ID(50826, 51691), REL::Relocate(0x114, 0x180) };
+		REL::Relocation<std::uintptr_t> compass02{ REL::VariantID(50826, 51691, 0x8B2BD0), REL::Relocate(0x114, 0x180, 0x13A) };
 		stl::write_thunk_call<CompassHook02>(compass02.address());
 
 		SKSE::log::info("Installed Hooks!");
