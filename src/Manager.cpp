@@ -78,12 +78,10 @@ void Manager::draw()
 	{
 		valueChanged = true;
 	}
-	/*
-	if (ImGui::("Hide Compass Quest Target Marker", &m_hideCompassQuestTargetMarker))
+	if (ImGui::InputFloat("Quest Target Marker Unlock Distance", &m_requiredQuestTargetDistance))
 	{
 		valueChanged = true;
 	}
-	*/
 
 	if (!m_marker)
 		selected = "None";
@@ -143,7 +141,7 @@ void Manager::setPlayerNear(const RE::RefHandle& mapTarget, const bool sameInter
 	}
 
 	const auto player = RE::PlayerCharacter::GetSingleton();
-	if (!player || !sameInteriorCell && mapTarget != 0) // player is not in same interior and the target is still far away
+	if (!player || !sameInteriorCell && isParentInteriorCell(player) && mapTarget != 0) // player is not in same interior and the target is still far away
 	{
 		m_isPlayerNear = false;
 		return;

@@ -77,7 +77,7 @@ namespace Hooks
 		{
 			auto result = func(a_menu, a_message);
 
-			if (a_message.type != RE::UI_MESSAGE_TYPE::kShow)
+			if (!a_menu || a_message.type != RE::UI_MESSAGE_TYPE::kShow)
 				return result;
 
 			const auto manager = Manager::GetSingleton();
@@ -111,7 +111,7 @@ namespace Hooks
 		{
 			const auto playerHandle = Utils::getPlayerCharacterHandle();
 
-			if (refHandle == 0 && camera->worldSpace)
+			if (refHandle == 0 && camera && camera->worldSpace)
 			{
 				//SKSE::log::info("Worldspace: {}", camera->worldSpace->GetFullName());
 
