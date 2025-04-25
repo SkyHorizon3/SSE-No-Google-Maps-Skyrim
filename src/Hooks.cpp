@@ -70,7 +70,7 @@ namespace Hooks
 			if (!handleData)
 				return false;
 
-			return handleData->refHandle != 0;
+			return handleData->refHandle != Utils::getPlayerCharacterHandle();
 		}
 
 		static RE::UI_MESSAGE_RESULTS thunk(RE::MapMenu* a_menu, RE::UIMessage& a_message)
@@ -83,7 +83,7 @@ namespace Hooks
 			const auto manager = Manager::GetSingleton();
 			const auto player = RE::PlayerCharacter::GetSingleton();
 
-			if (!isShowingQuestTarget(a_message.data) && !manager->isParentInteriorCell(player))
+			if (!manager->isParentInteriorCell(player) && !isShowingQuestTarget(a_message.data))
 			{
 				if (REL::Module::IsVR())
 					a_menu->GetVRRuntimeData2()->unk30530 = manager->getMarkerRefHandle(player);
@@ -109,9 +109,8 @@ namespace Hooks
 	{
 		static RE::NiPoint3* thunk(RE::MapCamera* camera, RE::NiPoint3* out, RE::RefHandle& refHandle, RE::TESObjectREFR* ref, RE::MapMenu* menu)
 		{
-			const auto playerHandle = *reinterpret_cast<RE::RefHandle*>(REL::VariantID(517013, 403520, 0x2FEB9EC).address());
+			const auto playerHandle = Utils::getPlayerCharacterHandle();
 
-			//SKSE::log::info("Handle: {0:08X}", refHandle);
 			if (refHandle == 0 && camera->worldSpace)
 			{
 				//SKSE::log::info("Worldspace: {}", camera->worldSpace->GetFullName());
@@ -120,7 +119,7 @@ namespace Hooks
 				out->y = (camera->worldSpace->minimumCoords.y + camera->worldSpace->maximumCoords.y) / 2;
 				out->z = 0.f;
 			}
-			else if (!ref || Manager::GetSingleton()->isParentInteriorCell(ref) || refHandle == playerHandle) // replace original logic
+			else if (!ref || refHandle == playerHandle || Manager::GetSingleton()->isParentInteriorCell(ref)) // replace original logic
 			{
 				const auto pos = REL::Module::IsVR() ? menu->GetVRRuntimeData2()->playerMarkerPosition : menu->GetRuntimeData2()->playerMarkerPosition;
 				*out = pos;
@@ -146,7 +145,7 @@ namespace Hooks
 
 		static void Install()
 		{
-			constexpr auto address = REL::VariantID(52214, 53101, 0x91B360); // Inlined in VR
+			constexpr auto address = REL::VariantID(52214, 53101, 0x91B360); // Inlined in VR, need to rewrite parts for support
 			REL::Relocation<std::uintptr_t> fillAddress{ address, REL::Relocate(0x1E5, 0x1E7) };
 
 			auto newCode = Patch();
@@ -174,18 +173,86 @@ namespace Hooks
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
 
-	// hide quest target marker. Only show when player is in area
-	struct CompassHook02
+	// Get the target ref for the quest. So we can get the distance to the player.
+	// Skyrim normally returns the next (door) reference if there are any. But we want the the marker like it's shown in the map menu.
+	// This function is always called right before the one below
+	struct GetRefHandleCompassHook
 	{
-		static bool thunk(void* unk, void* someScaleformInformation, RE::NiPoint3* pos, const RE::RefHandle& handle, std::uint32_t markerGotoFrame)
+		static RE::RefHandle& thunk(RE::TESQuestTarget* questTarget, RE::RefHandle& refHandle, RE::TESQuest* quest)
 		{
-			if (Manager::GetSingleton()->isCompassQuestTargetHidden())
-				return false;
+			RE::RefHandle& result = func(questTarget, refHandle, quest);
 
-			return func(unk, someScaleformInformation, pos, handle, markerGotoFrame);
+			/*
+				Next is some implementation of code I got from the journal menu questTargetID code, 1408EB320 for 1.5.97.
+				I don't fully get how this works under consideration of TESQuestTarget, and I don't care actually.
+
+				RE::TESObjectREFR* list = **(RE::TESObjectREFR***)(unk + 0x30); // that's the next door ref in the way to the quest target
+				bool doorAvailable = *(bool*)(unk + 0x40); // Seems to check if there is a door left or if the player is in same worldspace or cell
+
+			*/
+
+			Manager::GetSingleton()->handleQuestTarget(questTarget, quest);
+
+
+			return result;
 		}
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
+
+	// hide quest target marker. Only show when player is in area
+	struct CompassHook02
+	{
+		static bool thunk(void* unk, void* someScaleformInformation, RE::NiPoint3* pos, const RE::RefHandle& currentMarkerTargetHandle, std::uint32_t markerGotoFrame)
+		{
+			const auto manager = Manager::GetSingleton();
+			if (manager->isCompassQuestTargetHidden() && !manager->isPlayerNear())
+				return false;
+
+			return func(unk, someScaleformInformation, pos, currentMarkerTargetHandle, markerGotoFrame);
+		}
+		static inline REL::Relocation<decltype(thunk)> func;
+	};
+
+	/*
+	struct TargetIDTest
+	{
+		static RE::RefHandle& thunk(RE::RefHandle& handle01, RE::RefHandle& handle02, RE::PlayerCharacter::TeleportPath* target, bool a4, bool a5)
+		{
+			RE::RefHandle& test = func(handle01, handle02, target, a4, a5);
+
+			RE::TESObjectREFRPtr questTargetID = nullptr;
+
+			SKSE::log::info("Handle01: {0:08X}", handle01);
+			SKSE::log::info("Handle02: {0:08X}", handle02);
+			SKSE::log::info("result: {0:08X}", test);
+
+			if (RE::LookupReferenceByHandle(test, questTargetID))
+			{
+				SKSE::log::info("ID: {0:08X}", questTargetID->formID);
+			}
+
+			if (target)
+			{
+				for (const auto& unk00 : target->unk00)
+				{
+					if (unk00.interiorCell)
+					{
+						SKSE::log::info("ID: {0:08X}", unk00.interiorCell->formID);
+
+					}
+					else if (unk00.worldspace)
+					{
+						SKSE::log::info("ID: {0:08X}", unk00.worldspace->formID);
+
+					}
+				}
+			}
+
+			return test;
+		}
+		static inline REL::Relocation<decltype(thunk)> func;
+	};
+	*/
 
 	void InstallHooks()
 	{
@@ -210,6 +277,12 @@ namespace Hooks
 
 		REL::Relocation<std::uintptr_t> compass02{ REL::VariantID(50826, 51691, 0x8B2BD0), REL::Relocate(0x114, 0x180, 0x13A) };
 		stl::write_thunk_call<CompassHook02>(compass02.address());
+
+		REL::Relocation<std::uintptr_t> refhook{ REL::VariantID(50826, 51691, 0x8B2BD0), REL::Relocate(0xFB, 0x167, 0x117) };
+		stl::write_thunk_call<GetRefHandleCompassHook>(refhook.address());
+
+		//REL::Relocation<std::uintptr_t> ts{ REL::VariantID(52284, 0, 0x0), REL::Relocate(0x121, 0x0, 0x0) };
+		//stl::write_thunk_call<TargetIDTest>(ts.address());
 
 		SKSE::log::info("Installed Hooks!");
 	}

@@ -7,19 +7,21 @@ public:
 	bool isPlayerMarkerHidden() const noexcept { return m_isPlayerMarkerHidden; }
 	bool areCompassMarkersHidden() const noexcept { return m_hideCompassMapMarkers; }
 	bool isCompassQuestTargetHidden() const noexcept { return m_hideCompassQuestTargetMarker; }
+	bool isPlayerNear() const noexcept { return m_isPlayerNear; }
 
 	RE::RefHandle getMarkerRefHandle(const RE::PlayerCharacter* player);
 	RE::TESObjectREFR* getMarkerReference() const { return m_marker; }
-	bool isParentInteriorCell(const RE::TESObjectREFR* ref);
+	bool isParentInteriorCell(const RE::TESObjectREFR* const ref);
+	void handleQuestTarget(RE::TESQuestTarget* questTarget, RE::TESQuest* quest);
 
 	void draw();
 
 private:
 	std::string constructKey(const RE::TESObjectREFR* ref) const;
-	std::vector<std::string> enumerateMapMarkers() const;
-
-
+	void setPlayerNear(const RE::RefHandle& mapTarget, const bool doorAvailable);
 	const RE::TESWorldSpace* getRootWorldSpace(const RE::TESWorldSpace* ws);
+
+	std::vector<std::string> enumerateMapMarkers() const;
 
 	bool createCombo(const char* label, std::string& currentItem, std::vector<std::string>& items, ImGuiComboFlags_ flags);
 
@@ -30,9 +32,10 @@ private:
 	bool m_isPlayerMarkerHidden{ true };
 	bool m_hideCompassMapMarkers{ true };
 	bool m_hideCompassQuestTargetMarker{ true };
+	float m_requiredQuestTargetDistance{ 25000.f };
 
 	std::vector<std::string> m_mapMarkers{};
-
+	bool m_isPlayerNear{ false };
 };
 
 namespace Utils
@@ -95,23 +98,47 @@ namespace Utils
 	inline RE::FormID getTrimmedFormID(const RE::TESForm* form)
 	{
 		if (!form)
-		{
 			return 0;
-		}
 
-		const auto array = form->sourceFiles.array;
-		if (!array || array->empty())
-		{
+		const auto file = form->GetFile(0);
+		if (!file)
 			return 0;
-		}
 
 		RE::FormID formID = form->GetFormID() & 0xFFFFFF; // remove file index -> 0x00XXXXXX
-		if (array->front()->IsLight())
+		if (file->IsLight())
 		{
-			formID = formID & 0xFFF; // remove ESL index -> 0x00000XXX
+			formID &= 0xFFF; // remove ESL index -> 0x00000XXX
 		}
 
 		return formID;
 	}
 
+	// static REL::Relocation just for performance reasons...
+	inline RE::RefHandle getPlayerCharacterHandle()
+	{
+		static REL::Relocation<RE::RefHandle*> handle{ REL::VariantID(517013, 403520, 0x2FEB9EC) };
+		return *handle;
+	}
+
+	/*
+	inline RE::RefHandle getPlayerMarkerHandle()
+	{
+		static REL::Relocation<RE::RefHandle*> handle{ REL::VariantID(520103, 406633, 0x0) };
+		return *handle;
+	}
+	*/
+
+	inline RE::RefHandle& getQuestTargetRef(RE::TESQuestTarget* questTarget, RE::RefHandle& refHandle, bool a3, RE::TESQuest* quest)
+	{
+		using func_t = decltype(&getQuestTargetRef);
+		static REL::Relocation<func_t> func{ RELOCATION_ID(24815, 25284) };
+		return func(questTarget, refHandle, a3, quest);
+	}
+
+	inline RE::RefHandle& getQuestTargetPathRef(RE::RefHandle& out, RE::RefHandle& targetRefHandle, void* target, bool isSameInteriorCell, bool a5)
+	{
+		using func_t = decltype(&getQuestTargetPathRef);
+		static REL::Relocation<func_t> func{ RELOCATION_ID(52183, 53075) };
+		return func(out, targetRefHandle, target, isSameInteriorCell, a5); // target is probably RE::PlayerCharacter::TeleportPath*
+	}
 }

@@ -15,6 +15,7 @@ void Manager::parseINI()
 	m_isPlayerMarkerHidden = ini.GetBoolValue(section, "HidePlayerMapMarker");
 	m_hideCompassMapMarkers = ini.GetBoolValue(section, "HideCompassMapMarkers");
 	m_hideCompassQuestTargetMarker = ini.GetBoolValue(section, "HideCompassQuestTargetMarker");
+	m_requiredQuestTargetDistance = static_cast<float>(ini.GetDoubleValue(section, "RequiredQuestTargetDistance"));
 
 	const auto marker = ini.GetValue(section, "MapMarkerReference");
 	if (!marker || *marker == '\0')
@@ -46,6 +47,7 @@ void Manager::serializeINI()
 	ini.SetBoolValue(section, "HidePlayerMapMarker", m_isPlayerMarkerHidden);
 	ini.SetBoolValue(section, "HideCompassMapMarkers", m_hideCompassMapMarkers);
 	ini.SetBoolValue(section, "HideCompassQuestTargetMarker", m_hideCompassQuestTargetMarker);
+	ini.SetDoubleValue(section, "RequiredQuestTargetDistance", m_requiredQuestTargetDistance);
 
 	std::string markerString = "None";
 	if (m_marker)
@@ -76,6 +78,12 @@ void Manager::draw()
 	{
 		valueChanged = true;
 	}
+	/*
+	if (ImGui::("Hide Compass Quest Target Marker", &m_hideCompassQuestTargetMarker))
+	{
+		valueChanged = true;
+	}
+	*/
 
 	if (!m_marker)
 		selected = "None";
@@ -126,6 +134,60 @@ std::string Manager::constructKey(const RE::TESObjectREFR* ref) const
 	return {};
 }
 
+void Manager::setPlayerNear(const RE::RefHandle& mapTarget, const bool sameInteriorCell)
+{
+	if (sameInteriorCell || mapTarget == 0) // player is in same interior cell or in an interior cell near the target
+	{
+		m_isPlayerNear = true;
+		return;
+	}
+
+	const auto player = RE::PlayerCharacter::GetSingleton();
+	if (!player || !sameInteriorCell && mapTarget != 0) // player is not in same interior and the target is still far away
+	{
+		m_isPlayerNear = false;
+		return;
+	}
+
+	RE::TESObjectREFRPtr target = nullptr;
+	if (RE::LookupReferenceByHandle(mapTarget, target))
+	{
+		const auto playerPos = player->GetPosition();
+		const auto markerPos = target->GetPosition();
+
+		m_isPlayerNear = playerPos.GetDistance(markerPos) <= m_requiredQuestTargetDistance;
+		return;
+	}
+
+	m_isPlayerNear = false;
+}
+
+void Manager::handleQuestTarget(RE::TESQuestTarget* questTarget, RE::TESQuest* quest)
+{
+	RE::RefHandle finalTarget{};
+	finalTarget = Utils::getQuestTargetRef(questTarget, finalTarget, true, quest);
+
+	RE::TESObjectREFRPtr target = nullptr;
+	RE::LookupReferenceByHandle(finalTarget, target);
+
+	const auto player = RE::PlayerCharacter::GetSingleton();
+	bool isSameInterior = target && player && isParentInteriorCell(player) && target->GetParentCell() == player->GetParentCell();
+
+	RE::RefHandle mapTarget{};
+	mapTarget = Utils::getQuestTargetPathRef(mapTarget, finalTarget, &questTarget[1], isSameInterior, true);
+
+	setPlayerNear(mapTarget, isSameInterior);
+
+	/*
+	RE::TESObjectREFRPtr id = nullptr;
+	if (RE::LookupReferenceByHandle(mapTarget, id))
+	{
+		SKSE::log::info("ID: {0:08X}", id->formID);
+	}
+	*/
+
+}
+
 const RE::TESWorldSpace* Manager::getRootWorldSpace(const RE::TESWorldSpace* ws)
 {
 	while (ws && ws->parentWorld)
@@ -133,22 +195,15 @@ const RE::TESWorldSpace* Manager::getRootWorldSpace(const RE::TESWorldSpace* ws)
 	return ws;
 }
 
-bool Manager::isParentInteriorCell(const RE::TESObjectREFR* ref)
+// 1402ADB80 - 1.5.97
+bool Manager::isParentInteriorCell(const RE::TESObjectREFR* const a1)
 {
-	if (!ref)
-		return false;
+	const auto parentCell = a1->parentCell;
+	if (parentCell)
+		return parentCell->IsInteriorCell();
 
-	auto* parentCell = ref->GetParentCell();
-	if (!parentCell)
-	{
-		parentCell = ref->GetSaveParentCell();
-		if (!parentCell)
-		{
-			return false;
-		}
-	}
-
-	return parentCell->IsInteriorCell();
+	const auto saveParent = a1->GetSaveParentCell();
+	return !saveParent || saveParent->IsInteriorCell() || saveParent->GetRuntimeData().worldSpace == nullptr;
 }
 
 RE::RefHandle Manager::getMarkerRefHandle(const RE::PlayerCharacter* player)
