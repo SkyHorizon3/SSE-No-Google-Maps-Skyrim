@@ -85,10 +85,12 @@ namespace Hooks
 
 			if (!manager->isParentInteriorCell(player) && !isShowingQuestTarget(a_message.data))
 			{
+				const auto handle = manager->getMarkerRefHandle(player);
+
 				if (REL::Module::IsVR())
-					a_menu->GetVRRuntimeData2()->unk30530 = manager->getMarkerRefHandle(player);
+					a_menu->GetVRRuntimeData2()->unk30530 = handle;
 				else
-					a_menu->GetRuntimeData2()->unk30460 = manager->getMarkerRefHandle(player);
+					a_menu->GetRuntimeData2()->unk30460 = handle;
 			}
 
 			return result;
@@ -103,58 +105,75 @@ namespace Hooks
 	};
 
 	// Remove the default to Player reference when opening the map menu.
-	// This function is only exectued if the camera opening handle in the MapMenu class is not the player and not in an interior cell!
-	// Thats why we remove the if in the original code and replace it with our logic. In terms of compatibility this is still better than overwriting the call or whatever
 	struct MapCameraCenterHook
 	{
-		static RE::NiPoint3* thunk(RE::MapCamera* camera, RE::NiPoint3* out, RE::RefHandle& refHandle, RE::TESObjectREFR* ref, RE::MapMenu* menu)
-		{
-			const auto playerHandle = Utils::getPlayerCharacterHandle();
-
-			if (refHandle == 0 && camera && camera->worldSpace)
-			{
-				//SKSE::log::info("Worldspace: {}", camera->worldSpace->GetFullName());
-
-				out->x = (camera->worldSpace->minimumCoords.x + camera->worldSpace->maximumCoords.x) / 2;
-				out->y = (camera->worldSpace->minimumCoords.y + camera->worldSpace->maximumCoords.y) / 2;
-				out->z = 0.f;
-			}
-			else if (!ref || refHandle == playerHandle || Manager::GetSingleton()->isParentInteriorCell(ref)) // replace original logic
-			{
-				const auto pos = REL::Module::IsVR() ? menu->GetVRRuntimeData2()->playerMarkerPosition : menu->GetRuntimeData2()->playerMarkerPosition;
-				*out = pos;
-			}
-			else
-			{
-				out = func(camera, out, refHandle); // call original function. Since we replaced the other logics no need to run useless funcs
-			}
-
-			return out;
-		}
-		static inline REL::Relocation<RE::NiPoint3* (*)(RE::MapCamera* camera, RE::NiPoint3* out, RE::RefHandle& refHandle)> func;
-
 		struct Patch : Xbyak::CodeGenerator
 		{
-			Patch()
+			Patch(std::uintptr_t retn, std::uintptr_t func)
 			{
-				nop(26);
-				mov(ptr[rsp + 0x20], rdi); // RE::MapMenu*
-				mov(r9, ptr[rbp - 0x31]); // RE::TESObjectREFR*
+				Xbyak::Label funcLabel;
+				Xbyak::Label retnLabel;
+
+				push(rcx);
+
+				mov(rcx, rdi); // map menu ptr
+				call(ptr[rip + funcLabel]); //call thunk
+
+				movss(xmm0, ptr[rax]);
+				movss(ptr[rbp - 0x49], xmm0); // x
+
+				movss(xmm1, ptr[rax + 0x4]); // y
+				movss(ptr[rbp - 0x45], xmm1);
+
+				movss(xmm0, ptr[rax + 0x8]); // z
+				movss(ptr[rbp - 0x41], xmm0);
+
+				pop(rcx);
+
+				jmp(ptr[rip + retnLabel]); //jump back to original code
+
+				L(funcLabel);
+				dq(func);
+
+				L(retnLabel);
+				dq(retn);
 			}
 		};
 
+		static RE::NiPoint3* thunk(RE::MapMenu* menu)
+		{
+			static RE::NiPoint3 result{};
+
+			if (menu && menu->GetRuntimeData2()->unk30460 == 0)
+			{
+				const auto camera = &menu->GetRuntimeData2()->camera; // VR is different
+
+				result.x = (camera->worldSpace->minimumCoords.x + camera->worldSpace->maximumCoords.x) / 2;
+				result.y = (camera->worldSpace->minimumCoords.y + camera->worldSpace->maximumCoords.y) / 2;
+				result.z = 0.f;
+			}
+			else
+			{
+				result = REL::Module::IsVR() ? menu->GetVRRuntimeData2()->playerMarkerPosition : menu->GetRuntimeData2()->playerMarkerPosition;
+			}
+
+			return &result;
+		}
+
+
 		static void Install()
 		{
-			constexpr auto address = REL::VariantID(52214, 53101, 0x91B360); // Inlined in VR, need to rewrite parts for support
-			REL::Relocation<std::uintptr_t> fillAddress{ address, REL::Relocate(0x1E5, 0x1E7) };
+			// Inlined in VR, need to rewrite parts for support
+			REL::Relocation<std::uintptr_t> fillAddress{ REL::VariantID(52214, 53101, 0x91B360), REL::Relocate(0x1A9, 0x1AB) };
 
-			auto newCode = Patch();
-			assert(newCode.getSize() == 35);
+			const auto targetAddress = fillAddress.address();
 
-			REL::safe_write(fillAddress.address(), newCode.getCode(), newCode.getSize());
+			REL::safe_fill(targetAddress, REL::NOP, 0x27);
+			auto code = Patch(targetAddress + 0x27, stl::unrestricted_cast<std::uintptr_t>(thunk));
 
-			REL::Relocation<std::uintptr_t> centerFunc{ address, REL::Relocate(0x220, 0x222) };
-			stl::write_thunk_call<MapCameraCenterHook>(centerFunc.address());
+			auto& trampoline = SKSE::GetTrampoline();
+			auto result = trampoline.allocate(code);
+			trampoline.write_branch<5>(targetAddress, (std::uintptr_t)result);
 
 		}
 	};
