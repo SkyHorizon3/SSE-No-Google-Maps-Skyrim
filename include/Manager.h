@@ -18,7 +18,7 @@ public:
 
 private:
 	std::string constructKey(const RE::TESObjectREFR* ref) const;
-	void setPlayerNear(const RE::RefHandle& mapTarget, const bool doorAvailable);
+	void setPlayerNear(const RE::RefHandle& mapTarget, const bool doorAvailable, const RE::PlayerCharacter::TeleportPath* const teleportPath);
 	const RE::TESWorldSpace* getRootWorldSpace(const RE::TESWorldSpace* ws);
 
 	std::vector<std::string> enumerateMapMarkers() const;
@@ -135,10 +135,10 @@ namespace Utils
 		return func(questTarget, refHandle, a3, quest);
 	}
 
-	inline RE::RefHandle& getQuestTargetPathRef(RE::RefHandle& out, RE::RefHandle& targetRefHandle, void* target, bool isSameInteriorCell, bool a5)
+	inline RE::RefHandle& getQuestTargetPathRef(RE::RefHandle& out, RE::RefHandle& targetRefHandle, RE::PlayerCharacter::TeleportPath* target, bool isSameInteriorCell, bool a5)
 	{
 		using func_t = decltype(&getQuestTargetPathRef);
 		static REL::Relocation<func_t> func{ RELOCATION_ID(52183, 53075) };
-		return func(out, targetRefHandle, target, isSameInteriorCell, a5); // target is probably RE::PlayerCharacter::TeleportPath*
+		return func(out, targetRefHandle, target, isSameInteriorCell, a5);
 	}
 }

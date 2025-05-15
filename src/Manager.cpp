@@ -132,7 +132,7 @@ std::string Manager::constructKey(const RE::TESObjectREFR* ref) const
 	return {};
 }
 
-void Manager::setPlayerNear(const RE::RefHandle& mapTarget, const bool sameInteriorCell)
+void Manager::setPlayerNear(const RE::RefHandle& mapTarget, const bool sameInteriorCell, const RE::PlayerCharacter::TeleportPath* const teleportPath)
 {
 	if (sameInteriorCell || mapTarget == 0) // player is in same interior cell or in an interior cell near the target
 	{
@@ -141,8 +141,41 @@ void Manager::setPlayerNear(const RE::RefHandle& mapTarget, const bool sameInter
 	}
 
 	const auto player = RE::PlayerCharacter::GetSingleton();
-	if (!player || !sameInteriorCell && isParentInteriorCell(player) && mapTarget != 0) // player is not in same interior and the target is still far away
+	if (!player || !sameInteriorCell && isParentInteriorCell(player) && teleportPath) // player is not in same interior and the target is maybe still far away
 	{
+		const auto pathRefs = teleportPath->unk18;
+
+		for (std::uint32_t i = 0; i < pathRefs.size(); i++)
+		{
+			const auto& teleportRef = pathRefs[i].unk00;
+			if (!teleportRef)
+				continue;
+
+			const auto teleportLinkedDoor = teleportRef->extraList.GetTeleportLinkedDoor().get().get(); // get door in the linked cell
+			if (!teleportLinkedDoor)
+				continue;
+
+			if (isParentInteriorCell(teleportLinkedDoor)) // skip if it's interior
+				continue;
+
+			RE::TESObjectREFR* nextRef = nullptr;
+			if (i + 1 < pathRefs.size())
+			{
+				nextRef = pathRefs[i + 1].unk00;
+			}
+			else // hopefully handle cases where the target is directly in the worldspace and not in an interior again
+			{
+				RE::TESObjectREFRPtr target = nullptr;
+				if (RE::LookupReferenceByHandle(mapTarget, target))
+				{
+					nextRef = target.get();
+				}
+			}
+
+			m_isPlayerNear = nextRef && teleportLinkedDoor->GetDistance(nextRef) <= m_requiredQuestTargetDistance;
+			return;
+		}
+
 		m_isPlayerNear = false;
 		return;
 	}
@@ -150,10 +183,7 @@ void Manager::setPlayerNear(const RE::RefHandle& mapTarget, const bool sameInter
 	RE::TESObjectREFRPtr target = nullptr;
 	if (RE::LookupReferenceByHandle(mapTarget, target))
 	{
-		const auto playerPos = player->GetPosition();
-		const auto markerPos = target->GetPosition();
-
-		m_isPlayerNear = playerPos.GetDistance(markerPos) <= m_requiredQuestTargetDistance;
+		m_isPlayerNear = player->GetDistance(target.get()) <= m_requiredQuestTargetDistance;
 		return;
 	}
 
@@ -163,7 +193,7 @@ void Manager::setPlayerNear(const RE::RefHandle& mapTarget, const bool sameInter
 void Manager::handleQuestTarget(RE::TESQuestTarget* questTarget, RE::TESQuest* quest)
 {
 	RE::RefHandle finalTarget{};
-	finalTarget = Utils::getQuestTargetRef(questTarget, finalTarget, true, quest);
+	finalTarget = Utils::getQuestTargetRef(questTarget, finalTarget, true, quest); // gets the final target ref of the quest
 
 	RE::TESObjectREFRPtr target = nullptr;
 	RE::LookupReferenceByHandle(finalTarget, target);
@@ -172,9 +202,10 @@ void Manager::handleQuestTarget(RE::TESQuestTarget* questTarget, RE::TESQuest* q
 	bool isSameInterior = target && player && isParentInteriorCell(player) && target->GetParentCell() == player->GetParentCell();
 
 	RE::RefHandle mapTarget{};
-	mapTarget = Utils::getQuestTargetPathRef(mapTarget, finalTarget, &questTarget[1], isSameInterior, true);
+	auto teleportPath = reinterpret_cast<RE::PlayerCharacter::TeleportPath*>(&questTarget[1]);
+	mapTarget = Utils::getQuestTargetPathRef(mapTarget, finalTarget, teleportPath, isSameInterior, true); // gets the ref that is shown for the quest in the map menu atm
 
-	setPlayerNear(mapTarget, isSameInterior);
+	setPlayerNear(mapTarget, isSameInterior, teleportPath);
 
 	/*
 	RE::TESObjectREFRPtr id = nullptr;

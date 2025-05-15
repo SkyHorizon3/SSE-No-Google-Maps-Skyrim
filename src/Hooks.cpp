@@ -204,10 +204,6 @@ namespace Hooks
 			/*
 				Next is some implementation of code I got from the journal menu questTargetID code, 1408EB320 for 1.5.97.
 				I don't fully get how this works under consideration of TESQuestTarget, and I don't care actually.
-
-				RE::TESObjectREFR* list = **(RE::TESObjectREFR***)(unk + 0x30); // that's the next door ref in the way to the quest target
-				bool doorAvailable = *(bool*)(unk + 0x40); // Seems to check if there is a door left or if the player is in same worldspace or cell
-
 			*/
 
 			Manager::GetSingleton()->handleQuestTarget(questTarget, quest);
