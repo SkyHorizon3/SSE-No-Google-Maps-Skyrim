@@ -1,6 +1,8 @@
 #pragma once
 
-class Manager : public REX::Singleton<Manager>
+class Manager :
+	public REX::Singleton<Manager>,
+	public RE::BSTEventSink<RE::MenuOpenCloseEvent>
 {
 public:
 	void parseINI();
@@ -13,6 +15,7 @@ public:
 	RE::TESObjectREFR* getMarkerReference() const { return m_marker; }
 	bool isParentInteriorCell(const RE::TESObjectREFR* const ref);
 	void handleQuestTarget(RE::TESQuestTarget* questTarget, RE::TESQuest* quest);
+	void handleCameraState(RE::MapCamera* const camera);
 
 	void draw();
 
@@ -26,6 +29,9 @@ private:
 	bool createCombo(const char* label, std::string& currentItem, std::vector<std::string>& items, ImGuiComboFlags_ flags);
 
 	void serializeINI();
+	RE::MapCameraStates::Transition* asTransition(RE::TESCameraState* state);
+	RE::MapCameraStates::World* asWorld(RE::TESCameraState* state);
+	RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* source) override;
 
 	// INI
 	RE::TESObjectREFR* m_marker{ nullptr };
@@ -34,8 +40,11 @@ private:
 	bool m_hideCompassQuestTargetMarker{ true };
 	float m_requiredQuestTargetDistance{ 25000.f };
 
+	// misc
 	std::vector<std::string> m_mapMarkers{};
 	bool m_isPlayerNear{ false };
+	bool m_mapOpen{ false };
+	RE::NiPoint3 m_initOffset{};
 };
 
 namespace Utils

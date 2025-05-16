@@ -145,7 +145,7 @@ void Manager::setPlayerNear(const RE::RefHandle& mapTarget, const bool sameInter
 	{
 		const auto pathRefs = teleportPath->unk18;
 
-		for (std::uint32_t i = 0; i < pathRefs.size(); i++)
+		for (std::uint32_t i = 0; i < pathRefs.size(); i++) // pathRefs.size() mostly <= 5
 		{
 			const auto& teleportRef = pathRefs[i].unk00;
 			if (!teleportRef)
@@ -159,9 +159,10 @@ void Manager::setPlayerNear(const RE::RefHandle& mapTarget, const bool sameInter
 				continue;
 
 			RE::TESObjectREFR* nextRef = nullptr;
-			if (i + 1 < pathRefs.size())
+			const std::uint32_t nextPos = i + 1;
+			if (nextPos < pathRefs.size())
 			{
-				nextRef = pathRefs[i + 1].unk00;
+				nextRef = pathRefs[nextPos].unk00;
 			}
 			else // hopefully handle cases where the target is directly in the worldspace and not in an interior again
 			{
@@ -324,4 +325,111 @@ bool Manager::createCombo(const char* label, std::string& currentItem, std::vect
 	ImGui::PopItemWidth();
 
 	return itemChanged;
+}
+
+void Manager::handleCameraState(RE::MapCamera* const camera)
+{
+	const auto cameraState = camera->currentState.get();
+	if (!cameraState)
+		return;
+
+	const auto world = asWorld(cameraState);
+	const auto transition = asTransition(cameraState);
+
+	if (world && !m_mapOpen)
+	{
+		m_mapOpen = true;
+		m_initOffset = world->currentPositionScrollOffset;
+	}
+	else if (transition && m_mapOpen)
+	{
+		const auto transitionWorld = reinterpret_cast<RE::MapCameraStates::World*>(camera->unk68[0].get());
+		if (!transitionWorld)
+			return;
+
+		auto currentPos = transition->currentPosition;
+		SKSE::log::info("X: {} - Y: {} - Z: {}", currentPos.x, currentPos.y, currentPos.z);
+
+		auto dest = transition->zoomDestination;
+		SKSE::log::info("OFFSET - X: {} - Y: {} - Z: {}", dest.x, dest.y, dest.z);
+
+		auto origin = transition->zoomOrigin;
+		SKSE::log::info("ORIGIN - X: {} - Y: {} - Z: {}", origin.x, origin.y, origin.z);
+
+		/*
+		if (transitionWorld)
+		{
+			transitionWorld->currentPosition.x = x;
+			transitionWorld->currentPosition.y = y;
+		}
+		*/
+	}
+
+
+	/*
+	else if (auto* transition = asTransition(cameraState))
+	{
+		float x = 0.f;
+		float y = 0.f;
+		world = reinterpret_cast<RE::MapCameraStates::World*>(camera->unk68[0].get());
+
+
+		if (m_marker && world && world->mapData)
+		{
+			x = m_marker->GetPositionX();
+			y = m_marker->GetPositionY();
+		}
+
+
+		if (!m_mapOpen)
+		{
+			transition->zoomDestination = { x, transition->zoomDestination.y + (y - transition->currentPosition.y), transition->zoomDestination.z };
+			transition->zoomOrigin = { x, transition->zoomOrigin.y + (y - transition->currentPosition.y), transition->zoomOrigin.z };
+			transition->currentPosition = { x, y, transition->currentPosition.z };
+
+			if (world)
+			{
+				world->currentPosition.x = x;
+				world->currentPosition.y = y;
+			}
+
+		}
+		else
+		{
+			transition->zoomDestination = { x, y, transition->zoomDestination.z };
+		}
+
+	}
+	*/
+}
+
+RE::MapCameraStates::World* Manager::asWorld(RE::TESCameraState* state)
+{
+	if (state && *reinterpret_cast<std::uintptr_t*>(state) == RE::MapCameraStates::World::VTABLE[0].address())
+	{
+		return reinterpret_cast<RE::MapCameraStates::World*>(state);
+	}
+	return nullptr;
+}
+
+RE::MapCameraStates::Transition* Manager::asTransition(RE::TESCameraState* state)
+{
+	if (state && *reinterpret_cast<std::uintptr_t*>(state) == RE::MapCameraStates::Transition::VTABLE[0].address())
+	{
+		return reinterpret_cast<RE::MapCameraStates::Transition*>(state);
+	}
+	return nullptr;
+}
+
+RE::BSEventNotifyControl Manager::ProcessEvent(const RE::MenuOpenCloseEvent* event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* source)
+{
+	if (!event || !source)
+		return RE::BSEventNotifyControl::kContinue;
+
+	if (event->menuName == RE::MapMenu::MENU_NAME && !event->opening)
+	{
+		m_mapOpen = false;
+	}
+
+	return RE::BSEventNotifyControl::kContinue;
 }

@@ -31,6 +31,7 @@ void MessageListener(SKSE::MessagingInterface::Message* message)
 	case SKSE::MessagingInterface::kDataLoaded:
 	{
 		Load();
+		RE::UI::GetSingleton()->AddEventSink<RE::MenuOpenCloseEvent>(Manager::GetSingleton());
 		Manager::GetSingleton()->parseINI();
 	}
 	break;
@@ -103,7 +104,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse)
 		SKSE::stl::report_and_fail("No Google Maps Skyrim does not support VR atm."sv);
 	}
 
-	SKSE::AllocTrampoline(150);
+	SKSE::AllocTrampoline(200);
 	Hooks::InstallHooks();
 
 	SKSE::GetMessagingInterface()->RegisterListener(MessageListener);

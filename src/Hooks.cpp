@@ -1,9 +1,5 @@
 #include "Hooks.h"
 #include "Manager.h"
-#include <windows.h>
-#include <dbghelp.h>
-#include <iostream>
-#include <psapi.h>
 
 namespace Hooks
 {
@@ -76,6 +72,14 @@ namespace Hooks
 		static RE::UI_MESSAGE_RESULTS thunk(RE::MapMenu* a_menu, RE::UIMessage& a_message)
 		{
 			auto result = func(a_menu, a_message);
+
+			/*
+			if (a_message.type == RE::UI_MESSAGE_TYPE::kHide)
+			{
+				auto unk = a_menu->GetRuntimeData2()->camera.unk40;
+				SKSE::log::info("X: {} - Y: {} - Z: {}", unk.x, unk.y, unk.z);
+			}
+			*/
 
 			if (!a_menu || a_message.type != RE::UI_MESSAGE_TYPE::kShow)
 				return result;
@@ -151,6 +155,7 @@ namespace Hooks
 				result.x = (camera->worldSpace->minimumCoords.x + camera->worldSpace->maximumCoords.x) / 2;
 				result.y = (camera->worldSpace->minimumCoords.y + camera->worldSpace->maximumCoords.y) / 2;
 				result.z = 0.f;
+
 			}
 			else
 			{
@@ -228,44 +233,60 @@ namespace Hooks
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
 
-	/*
-	struct TargetIDTest
+	RE::TESCamera* g_mapCamera = nullptr;
+	struct MapMenuCtor
 	{
-		static RE::RefHandle& thunk(RE::RefHandle& handle01, RE::RefHandle& handle02, RE::PlayerCharacter::TeleportPath* target, bool a4, bool a5)
+		static RE::MapMenu* thunk(RE::MapMenu* map)
 		{
-			RE::RefHandle& test = func(handle01, handle02, target, a4, a5);
+			g_mapCamera = &map->GetRuntimeData2()->camera;
+			return func(map);
+		};
+		static inline REL::Relocation<decltype(thunk)> func;
+	};
 
-			RE::TESObjectREFRPtr questTargetID = nullptr;
-
-			SKSE::log::info("Handle01: {0:08X}", handle01);
-			SKSE::log::info("Handle02: {0:08X}", handle02);
-			SKSE::log::info("result: {0:08X}", test);
-
-			if (RE::LookupReferenceByHandle(test, questTargetID))
+	struct CameraStateHook
+	{
+		static RE::TESCameraState* thunk(RE::MapCamera* camera)
+		{
+			auto result = func(camera);
+			if (camera != g_mapCamera)
 			{
-				SKSE::log::info("ID: {0:08X}", questTargetID->formID);
+				return result;
 			}
 
-			if (target)
+			Manager::GetSingleton()->handleCameraState(camera);
+
+			return result;
+		};
+		static inline REL::Relocation<decltype(thunk)> func;
+	};
+
+	/*
+	struct CameraWorldDtor
+	{
+		static void* thunk(RE::MapCameraStates::World* world, char a2)
+		{
+
+			if (world)
 			{
-				for (const auto& unk00 : target->unk00)
-				{
-					if (unk00.interiorCell)
-					{
-						SKSE::log::info("ID: {0:08X}", unk00.interiorCell->formID);
+				auto currentPos = world->currentPosition;
+				SKSE::log::info("X: {} - Y: {} - Z: {}", currentPos.x, currentPos.y, currentPos.z);
 
-					}
-					else if (unk00.worldspace)
-					{
-						SKSE::log::info("ID: {0:08X}", unk00.worldspace->formID);
-
-					}
-				}
+				auto dest = world->currentPositionScrollOffset;
+				SKSE::log::info("OFFSET - X: {} - Y: {} - Z: {}", dest.x, dest.y, dest.z);
 			}
 
-			return test;
+
+			// RE::MapCameraStates::World* [21:32:36:148] [info] X: 5821.235 - Y: 56397.973 - Z: 177.57991
+			return func(world, a2);
 		}
 		static inline REL::Relocation<decltype(thunk)> func;
+
+		static void Install()
+		{
+			REL::Relocation<std::uintptr_t> Vtbl{ RE::VTABLE_MapCameraStates__World[0] };
+			func = Vtbl.write_vfunc(0x0, &thunk);
+		}
 	};
 	*/
 
@@ -296,8 +317,11 @@ namespace Hooks
 		REL::Relocation<std::uintptr_t> refhook{ REL::VariantID(50826, 51691, 0x8B2BD0), REL::Relocate(0xFB, 0x167, 0x117) };
 		stl::write_thunk_call<GetRefHandleCompassHook>(refhook.address());
 
-		//REL::Relocation<std::uintptr_t> ts{ REL::VariantID(52284, 0, 0x0), REL::Relocate(0x121, 0x0, 0x0) };
-		//stl::write_thunk_call<TargetIDTest>(ts.address());
+		REL::Relocation<std::uintptr_t> mapCtorHook{ RELOCATION_ID(52248, 53139), 0x5D };
+		stl::write_thunk_call<MapMenuCtor>(mapCtorHook.address());
+
+		REL::Relocation<std::uintptr_t> statePrologueHook{ RELOCATION_ID(32289, 33025) };
+		stl::hook_function_prologue<CameraStateHook, 6>(statePrologueHook.address());
 
 		SKSE::log::info("Installed Hooks!");
 	}
