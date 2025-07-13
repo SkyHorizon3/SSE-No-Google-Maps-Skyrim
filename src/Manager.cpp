@@ -275,7 +275,7 @@ std::vector<std::string> Manager::enumerateMapMarkers() const
 			continue;
 
 		const auto ref = form->As<RE::TESObjectREFR>();
-		if (!ref || ref->IsDisabled() || !ref->IsPersistent())
+		if (!ref || !ref->IsPersistent())
 			continue;
 
 		const std::string val = constructKey(ref);

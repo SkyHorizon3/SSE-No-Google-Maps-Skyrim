@@ -197,11 +197,7 @@ namespace Hooks
 		{
 			RE::RefHandle& result = func(questTarget, refHandle, quest);
 
-			/*
-				Next is some implementation of code I got from the journal menu questTargetID code, 1408EB320 for 1.5.97.
-				I don't fully get how this works under consideration of TESQuestTarget, and I don't care actually.
-			*/
-
+			//Next is some implementation of code I got from the journal menu questTargetID code, 1408EB320 for 1.5.97.
 			Manager::GetSingleton()->handleQuestTarget(questTarget, quest);
 
 
