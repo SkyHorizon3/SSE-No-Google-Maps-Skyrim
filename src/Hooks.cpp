@@ -1,9 +1,5 @@
 #include "Hooks.h"
 #include "Manager.h"
-#include <windows.h>
-#include <dbghelp.h>
-#include <iostream>
-#include <psapi.h>
 
 namespace Hooks
 {
@@ -88,9 +84,9 @@ namespace Hooks
 				const auto handle = manager->getMarkerRefHandle(player);
 
 				if (REL::Module::IsVR())
-					a_menu->GetVRRuntimeData2()->unk30530 = handle;
+					a_menu->GetVRRuntimeData2()->cameraOpeningCenter = handle;
 				else
-					a_menu->GetRuntimeData2()->unk30460 = handle;
+					a_menu->GetRuntimeData2()->cameraOpeningCenter = handle;
 			}
 
 			return result;
@@ -144,7 +140,7 @@ namespace Hooks
 		{
 			static RE::NiPoint3 result{};
 
-			if (menu && menu->GetRuntimeData2()->unk30460 == 0)
+			if (menu && menu->GetRuntimeData2()->cameraOpeningCenter == 0)
 			{
 				const auto camera = &menu->GetRuntimeData2()->camera; // VR is different
 
