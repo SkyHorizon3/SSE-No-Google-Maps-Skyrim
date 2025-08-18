@@ -103,7 +103,6 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse)
 		SKSE::stl::report_and_fail("No Google Maps Skyrim does not support VR atm."sv);
 	}
 
-	SKSE::AllocTrampoline(150);
 	Hooks::InstallHooks();
 
 	SKSE::GetMessagingInterface()->RegisterListener(MessageListener);

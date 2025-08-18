@@ -14,6 +14,7 @@ namespace Hooks
 			return func(playerMarker, playerMarkerPos);
 		};
 
+		/*
 		static bool thunkVR(RE::BSTArray<RE::MapMenuMarker>* playerMarker, RE::NiPoint3* playerMarkerPos, RE::NiPoint3* unk)
 		{
 			if (Manager::GetSingleton()->isPlayerMarkerHidden())
@@ -21,18 +22,20 @@ namespace Hooks
 
 			return funcVR(playerMarker, playerMarkerPos, unk);
 		};
+		*/
 
 		static inline REL::Relocation<decltype(thunk)> func;
-		static inline REL::Relocation<decltype(thunkVR)> funcVR;
+		//static inline REL::Relocation<decltype(thunkVR)> funcVR;
 
 		static void Install()
 		{
 			REL::Relocation<std::uintptr_t> markerHook{ REL::VariantID(52221, 53108, 0x9184C0), REL::Relocate(0x121,0x121,0x124) };
 
-			if (REL::Module::IsVR())
-				funcVR = SKSE::GetTrampoline().write_call<5>(markerHook.address(), thunkVR);
-			else
-				func = SKSE::GetTrampoline().write_call<5>(markerHook.address(), thunk);
+			//if (REL::Module::IsVR())
+			//funcVR = SKSE::GetTrampoline().write_call<5>(markerHook.address(), thunkVR);
+			//else
+
+			func = SKSE::GetTrampoline().write_call<5>(markerHook.address(), thunk);
 		}
 	};
 
@@ -218,51 +221,99 @@ namespace Hooks
 			return func(unk, someScaleformInformation, pos, currentMarkerTargetHandle, markerGotoFrame);
 		}
 		static inline REL::Relocation<decltype(thunk)> func;
-	};
 
-	/*
-	struct TargetIDTest
-	{
-		static RE::RefHandle& thunk(RE::RefHandle& handle01, RE::RefHandle& handle02, RE::PlayerCharacter::TeleportPath* target, bool a4, bool a5)
+		static bool CNOthunk()
 		{
-			RE::RefHandle& test = func(handle01, handle02, target, a4, a5);
+			const auto manager = Manager::GetSingleton();
+			if (manager->isCompassQuestTargetHidden() && !manager->isPlayerNear())
+				return false;
 
-			RE::TESObjectREFRPtr questTargetID = nullptr;
-
-			SKSE::log::info("Handle01: {0:08X}", handle01);
-			SKSE::log::info("Handle02: {0:08X}", handle02);
-			SKSE::log::info("result: {0:08X}", test);
-
-			if (RE::LookupReferenceByHandle(test, questTargetID))
-			{
-				SKSE::log::info("ID: {0:08X}", questTargetID->formID);
-			}
-
-			if (target)
-			{
-				for (const auto& unk00 : target->unk00)
-				{
-					if (unk00.interiorCell)
-					{
-						SKSE::log::info("ID: {0:08X}", unk00.interiorCell->formID);
-
-					}
-					else if (unk00.worldspace)
-					{
-						SKSE::log::info("ID: {0:08X}", unk00.worldspace->formID);
-
-					}
-				}
-			}
-
-			return test;
+			return true;
 		}
-		static inline REL::Relocation<decltype(thunk)> func;
+
+		// CompassNavigationOverhaul write_branches the original call. That our logic can work we chain on top of it
+		struct CNOPatch : Xbyak::CodeGenerator
+		{
+			CNOPatch(std::uintptr_t cno, std::uintptr_t skip, std::uintptr_t cnoFunc)
+			{
+				Xbyak::Label funcLabel;
+				Xbyak::Label cnoLabel;
+				Xbyak::Label skipLabel;
+
+				Xbyak::Label doCno;
+				Xbyak::Label doSkip;
+
+				push(rcx);
+				push(rdx);
+				push(r8);
+				push(r9);
+
+				sub(rsp, 0x20);
+				call(ptr[rip + funcLabel]); // call thunk
+				add(rsp, 0x20);
+
+				test(al, al);
+
+				pop(r9);
+				pop(r8);
+				pop(rdx);
+				pop(rcx);
+
+				jnz(doCno);
+				jmp(doSkip);
+
+				// execute cno code
+				L(doCno);
+				jmp(ptr[rip + cnoLabel]);
+
+				// skip over cno code, use our return value (false)
+				L(doSkip);
+				jmp(ptr[rip + skipLabel]);
+
+				L(funcLabel);
+				dq(cnoFunc);
+
+				L(cnoLabel);
+				dq(cno);
+
+				L(skipLabel);
+				dq(skip);
+			}
+		};
+
+		static void Install(const bool cnoFound)
+		{
+			REL::Relocation<std::uintptr_t> compass02{ REL::VariantID(50826, 51691, 0x8B2BD0), REL::Relocate(0x114, 0x180, 0x13A) };
+			auto targetAddress = compass02.address();
+
+			if (cnoFound)
+			{
+				std::int32_t rel = *reinterpret_cast<std::int32_t*>(targetAddress + 1);
+				std::uintptr_t instr_end = targetAddress + 5;
+				std::uintptr_t absolute = instr_end + rel;
+
+				auto code = CNOPatch(absolute, targetAddress + 0x5, stl::unrestricted_cast<std::uintptr_t>(CNOthunk));
+
+				auto& trampoline = SKSE::GetTrampoline();
+				auto result = trampoline.allocate(code);
+				trampoline.write_branch<5>(targetAddress, (std::uintptr_t)result);
+
+				SKSE::log::info("Installed compatibility for Compass Navigation Overhaul!");
+			}
+			else
+			{
+				stl::write_thunk_call<CompassHook02>(targetAddress);
+			}
+		}
 	};
-	*/
 
 	void InstallHooks()
 	{
+		bool cnoFound = GetModuleHandle(L"CompassNavigationOverhaul.dll");
+		size_t amount = cnoFound ? 215 : 150;
+		SKSE::AllocTrampoline(amount);
+
+
 		PlayerMarkerHook::Install();
 
 		// CurrentLocationReturnHook
@@ -282,14 +333,10 @@ namespace Hooks
 		REL::Relocation<std::uintptr_t> compass01{ REL::VariantID(50870, 51744, 0x8B4170), REL::Relocate(0x450, 0x473, 0x468) };
 		stl::write_thunk_call<CompassHook01>(compass01.address());
 
-		REL::Relocation<std::uintptr_t> compass02{ REL::VariantID(50826, 51691, 0x8B2BD0), REL::Relocate(0x114, 0x180, 0x13A) };
-		stl::write_thunk_call<CompassHook02>(compass02.address());
+		CompassHook02::Install(cnoFound);
 
 		REL::Relocation<std::uintptr_t> refhook{ REL::VariantID(50826, 51691, 0x8B2BD0), REL::Relocate(0xFB, 0x167, 0x117) };
 		stl::write_thunk_call<GetRefHandleCompassHook>(refhook.address());
-
-		//REL::Relocation<std::uintptr_t> ts{ REL::VariantID(52284, 0, 0x0), REL::Relocate(0x121, 0x0, 0x0) };
-		//stl::write_thunk_call<TargetIDTest>(ts.address());
 
 		SKSE::log::info("Installed Hooks!");
 	}
