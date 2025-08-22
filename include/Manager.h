@@ -60,24 +60,17 @@ namespace Utils
 			return haystack;
 		}
 
-		// Get length of needle and convert it to lowercase
-		size_t needle_len = strlen(needle);
-		char* lower_needle = new char[needle_len + 1];
-		for (size_t i = 0; i < needle_len; ++i)
-		{
-			lower_needle[i] = (char)tolower(needle[i]);
-		}
-		lower_needle[needle_len] = '\0';
-
-		const char first_lower_needle = lower_needle[0];
+		const char first = static_cast<char>(std::tolower(static_cast<unsigned char>(*needle)));
 
 		for (; *haystack; ++haystack)
 		{
-			if (tolower(*haystack) == first_lower_needle)
+			if (std::tolower(static_cast<unsigned char>(*haystack)) == first)
 			{
-				const char* h = haystack;
-				const char* n = lower_needle;
-				while (*h && *n && tolower(*h) == *n)
+				const char* h = haystack + 1;
+				const char* n = needle + 1;
+				while (*n && *h &&
+					std::tolower(static_cast<unsigned char>(*h)) ==
+					std::tolower(static_cast<unsigned char>(*n)))
 				{
 					++h;
 					++n;
@@ -85,13 +78,11 @@ namespace Utils
 
 				if (!*n)
 				{
-					delete[] lower_needle;
 					return haystack;
 				}
 			}
 		}
 
-		delete[] lower_needle;
 		return nullptr;
 	}
 
@@ -133,5 +124,12 @@ namespace Utils
 		using func_t = decltype(&getQuestTargetPathRef);
 		static REL::Relocation<func_t> func{ RELOCATION_ID(52183, 53075) };
 		return func(out, targetRefHandle, target, isSameInteriorCell, a5);
+	}
+
+	inline bool getMaxHeightAtPoint(RE::TESWorldSpace* worldSpace, const RE::NiPoint3& xy, float& z)
+	{
+		using func_t = decltype(&getMaxHeightAtPoint);
+		static REL::Relocation<func_t> func{ RELOCATION_ID(20103, 20551) };
+		return func(worldSpace, xy, z);
 	}
 }

@@ -145,11 +145,25 @@ namespace Hooks
 
 			if (menu && menu->GetRuntimeData2()->cameraOpeningCenter == 0)
 			{
-				const auto camera = &menu->GetRuntimeData2()->camera; // VR is different
+				const auto camera = &menu->GetRuntimeData2()->camera;
+				auto worldspace = camera->worldSpace;
+				const auto mapData = worldspace->worldMapData;
 
-				result.x = (camera->worldSpace->minimumCoords.x + camera->worldSpace->maximumCoords.x) / 2;
-				result.y = (camera->worldSpace->minimumCoords.y + camera->worldSpace->maximumCoords.y) / 2;
-				result.z = 0.f;
+				RE::NiPoint3 pos{};
+
+				auto seCellX = static_cast<float>(mapData.seCellX << 12);
+				auto seCellY = static_cast<float>(mapData.seCellY << 12);
+				auto nwCellX = static_cast<float>(mapData.nwCellX << 12);
+				auto nwCellY = static_cast<float>(mapData.nwCellY << 12);
+
+				pos.x = (seCellX + nwCellX) * 0.5f;
+				pos.y = (seCellY + nwCellY) * 0.5f;
+
+				float z = 0.f;
+				//Utils::getMaxHeightAtPoint(worldspace, pos, z);
+
+
+				result = { pos.x, pos.y, z };
 			}
 			else
 			{

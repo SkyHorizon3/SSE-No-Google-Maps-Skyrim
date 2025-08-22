@@ -14,6 +14,11 @@ vcpkg_from_github(
     HEAD_REF master
 )
 
+vcpkg_configure_cmake(
+    SOURCE_PATH "${SOURCE_PATH2}"
+    PREFER_NINJA
+)
+
 file(GLOB OPENVR_FILES "${SOURCE_PATH2}/*")
 
 file(COPY ${OPENVR_FILES} DESTINATION "${SOURCE_PATH}/extern/openvr")
