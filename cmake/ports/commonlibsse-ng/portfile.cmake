@@ -19,6 +19,11 @@ vcpkg_configure_cmake(
     PREFER_NINJA
 )
 
+vcpkg_build_cmake(
+    SOURCE_PATH "${SOURCE_PATH2}"
+    PREFER_NINJA
+)
+
 file(GLOB OPENVR_FILES "${SOURCE_PATH2}/*")
 
 file(COPY ${OPENVR_FILES} DESTINATION "${SOURCE_PATH}/extern/openvr")

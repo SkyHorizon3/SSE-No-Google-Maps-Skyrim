@@ -150,20 +150,15 @@ namespace Hooks
 				const auto mapData = worldspace->worldMapData;
 
 				RE::NiPoint3 pos{};
-
-				auto seCellX = static_cast<float>(mapData.seCellX << 12);
-				auto seCellY = static_cast<float>(mapData.seCellY << 12);
-				auto nwCellX = static_cast<float>(mapData.nwCellX << 12);
-				auto nwCellY = static_cast<float>(mapData.nwCellY << 12);
+				const auto seCellX = static_cast<float>(mapData.seCellX << 12); // CellToWorldCoord
+				const auto seCellY = static_cast<float>(mapData.seCellY << 12);
+				const auto nwCellX = static_cast<float>(mapData.nwCellX << 12);
+				const auto nwCellY = static_cast<float>(mapData.nwCellY << 12);
 
 				pos.x = (seCellX + nwCellX) * 0.5f;
 				pos.y = (seCellY + nwCellY) * 0.5f;
 
-				float z = 0.f;
-				//Utils::getMaxHeightAtPoint(worldspace, pos, z);
-
-
-				result = { pos.x, pos.y, z };
+				result = pos;
 			}
 			else
 			{
