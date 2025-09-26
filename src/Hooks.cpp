@@ -52,26 +52,8 @@ namespace Hooks
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
 
-	class RefHandleUIData : public RE::IUIMessageData {
-	public:
-		uint32_t refHandle;  // 10
-		uint32_t pad14;      // 14
-	};
-
 	struct MapMenuProcessMessageHook
 	{
-		static bool isShowingQuestTarget(RE::IUIMessageData* data)
-		{
-			if (!data)
-				return false;
-
-			const auto handleData = static_cast<RefHandleUIData*>(data);
-			if (!handleData)
-				return false;
-
-			return handleData->refHandle != Utils::getPlayerCharacterHandle();
-		}
-
 		static RE::UI_MESSAGE_RESULTS thunk(RE::MapMenu* a_menu, RE::UIMessage& a_message)
 		{
 			auto result = func(a_menu, a_message);
@@ -79,18 +61,7 @@ namespace Hooks
 			if (!a_menu || a_message.type != RE::UI_MESSAGE_TYPE::kShow)
 				return result;
 
-			const auto manager = Manager::GetSingleton();
-			const auto player = RE::PlayerCharacter::GetSingleton();
-
-			if (!manager->isParentInteriorCell(player) && !isShowingQuestTarget(a_message.data))
-			{
-				const auto handle = manager->getMarkerRefHandle(player);
-
-				if (REL::Module::IsVR())
-					a_menu->GetVRRuntimeData2()->cameraOpeningCenter = handle;
-				else
-					a_menu->GetRuntimeData2()->cameraOpeningCenter = handle;
-			}
+			Manager::GetSingleton()->setCameraCenter(a_menu, a_message);
 
 			return result;
 		}
@@ -146,15 +117,14 @@ namespace Hooks
 			if (menu && menu->GetRuntimeData2()->cameraOpeningCenter == 0)
 			{
 				const auto camera = &menu->GetRuntimeData2()->camera;
-				auto worldspace = camera->worldSpace;
-				const auto mapData = worldspace->worldMapData;
+				const auto mapData = camera->worldSpace->worldMapData;
 
-				RE::NiPoint3 pos{};
 				const auto seCellX = static_cast<float>(mapData.seCellX << 12); // CellToWorldCoord
 				const auto seCellY = static_cast<float>(mapData.seCellY << 12);
 				const auto nwCellX = static_cast<float>(mapData.nwCellX << 12);
 				const auto nwCellY = static_cast<float>(mapData.nwCellY << 12);
 
+				RE::NiPoint3 pos{};
 				pos.x = (seCellX + nwCellX) * 0.5f;
 				pos.y = (seCellY + nwCellY) * 0.5f;
 
@@ -162,7 +132,7 @@ namespace Hooks
 			}
 			else
 			{
-				result = REL::Module::IsVR() ? menu->GetVRRuntimeData2()->playerMarkerPosition : menu->GetRuntimeData2()->playerMarkerPosition;
+				result = menu->GetRuntimeData2()->playerMarkerPosition; // REL::Module::IsVR() ? menu->GetVRRuntimeData2()->playerMarkerPosition :
 			}
 
 			return &result;
@@ -318,7 +288,7 @@ namespace Hooks
 
 	void InstallHooks()
 	{
-		bool cnoFound = GetModuleHandle(L"CompassNavigationOverhaul.dll");
+		bool cnoFound = REX::W32::GetModuleHandleA("CompassNavigationOverhaul.dll");
 		size_t amount = cnoFound ? 215 : 150;
 		SKSE::AllocTrampoline(amount);
 

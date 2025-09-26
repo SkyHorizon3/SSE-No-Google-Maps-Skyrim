@@ -1,7 +1,7 @@
 {
   "name": "nogooglemapsskyrim",
-  "version-string": "1.0.0",
-  "description": "CLib NG example plugin",
+  "version-string": "0.2.0",
+  "description": "NoGoogleMapsSkyrim",
   "license": "GPL-3.0",
   "dependencies": [
     "commonlibsse-ng",

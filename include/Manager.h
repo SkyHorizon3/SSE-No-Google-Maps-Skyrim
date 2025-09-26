@@ -13,10 +13,12 @@ public:
 	RE::TESObjectREFR* getMarkerReference() const { return m_marker; }
 	bool isParentInteriorCell(const RE::TESObjectREFR* const ref);
 	void handleQuestTarget(RE::TESQuestTarget* questTarget, RE::TESQuest* quest);
+	void setCameraCenter(RE::MapMenu* a_menu, RE::UIMessage& a_message);
 
 	void draw();
 
 private:
+	bool isShowingQuestTarget(RE::IUIMessageData* data);
 	std::string constructKey(const RE::TESObjectREFR* ref) const;
 	void setPlayerNear(const RE::RefHandle& mapTarget, const bool doorAvailable, const RE::TeleportPath* const teleportPath);
 	const RE::TESWorldSpace* getRootWorldSpace(const RE::TESWorldSpace* ws);
@@ -37,6 +39,16 @@ private:
 	std::vector<std::string> m_mapMarkers{};
 	bool m_isPlayerNear{ false };
 };
+
+namespace RE
+{
+	class RefHandleUIData : public RE::IUIMessageData
+	{
+	public:
+		uint32_t refHandle;  // 10
+		uint32_t pad14;      // 14
+	};
+}
 
 namespace Utils
 {

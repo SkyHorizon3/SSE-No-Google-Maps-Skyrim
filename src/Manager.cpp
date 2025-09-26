@@ -217,6 +217,33 @@ void Manager::handleQuestTarget(RE::TESQuestTarget* questTarget, RE::TESQuest* q
 
 }
 
+bool Manager::isShowingQuestTarget(RE::IUIMessageData* data)
+{
+	if (!data)
+		return false;
+
+	const auto handleData = static_cast<RE::RefHandleUIData*>(data);
+	if (!handleData)
+		return false;
+
+	return handleData->refHandle != Utils::getPlayerCharacterHandle();
+}
+
+void Manager::setCameraCenter(RE::MapMenu* a_menu, RE::UIMessage& a_message)
+{
+	const auto player = RE::PlayerCharacter::GetSingleton();
+
+	if (!isParentInteriorCell(player) && !isShowingQuestTarget(a_message.data))
+	{
+		const auto handle = getMarkerRefHandle(player);
+
+		//if (REL::Module::IsVR())
+		//	a_menu->GetVRRuntimeData2()->cameraOpeningCenter = handle;
+		//else
+		a_menu->GetRuntimeData2()->cameraOpeningCenter = handle;
+	}
+}
+
 const RE::TESWorldSpace* Manager::getRootWorldSpace(const RE::TESWorldSpace* ws)
 {
 	while (ws && ws->parentWorld)
