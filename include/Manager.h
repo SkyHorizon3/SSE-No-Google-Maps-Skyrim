@@ -137,4 +137,11 @@ namespace Utils
 		static REL::Relocation<func_t> func{ RELOCATION_ID(52183, 53075) };
 		return func(out, targetRefHandle, target, isSameInteriorCell, a5);
 	}
+
+	inline bool getMaxHeightAt(RE::TESWorldSpace* worldSpace, const RE::NiPoint3& point, float& outHeight)
+	{
+		using func_t = decltype(&getMaxHeightAt);
+		static REL::Relocation<func_t> func{ RELOCATION_ID(20103, 20551) };
+		return func(worldSpace, point, outHeight);
+	}
 }

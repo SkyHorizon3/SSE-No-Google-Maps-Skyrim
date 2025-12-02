@@ -80,7 +80,7 @@ namespace Hooks
 		static void thunk(RE::MapCamera* camera, RE::NiNode* root, const RE::NiPoint3& mapPos)
 		{
 			const auto ui = RE::UI::GetSingleton();
-			const auto menu = ui ? ui->GetMenu<RE::MapMenu>().get() : nullptr;
+			const auto menu = ui ? ui->GetMenu<RE::MapMenu>() : nullptr;
 			const auto runtimeData = menu ? menu->GetRuntimeData2() : nullptr;
 
 			if (!menu || !runtimeData)
@@ -102,6 +102,20 @@ namespace Hooks
 			RE::NiPoint3 pos{};
 			pos.x = (seCellX + nwCellX) * 0.5f;
 			pos.y = (seCellY + nwCellY) * 0.5f;
+
+			static bool cnoFound = REX::W32::GetModuleHandleA("FlatMapMarkersSSE.dll");
+			if (cnoFound)
+			{
+				pos.z = 180000.0f;
+			}
+			else
+			{
+				float maxHeight{};
+				if (Utils::getMaxHeightAt(camera->worldSpace, pos, maxHeight))
+				{
+					pos.z = maxHeight;
+				}
+			}
 
 			func(camera, root, pos);
 		}
