@@ -7,7 +7,7 @@ public:
 	bool isPlayerMarkerHidden() const noexcept { return m_isPlayerMarkerHidden; }
 	bool areCompassMarkersHidden() const noexcept { return m_hideCompassMapMarkers; }
 	bool isCompassQuestTargetHidden() const noexcept { return m_hideCompassQuestTargetMarker; }
-	bool isPlayerNear() const noexcept { return m_isPlayerNear; }
+	bool isPlayerNearQuestTarget() const noexcept { return m_isPlayerNearQuestTarget; }
 
 	RE::RefHandle getMarkerRefHandle(const RE::PlayerCharacter* player);
 	RE::TESObjectREFR* getMarkerReference() const { return m_marker; }
@@ -20,7 +20,7 @@ public:
 private:
 	bool isShowingQuestTarget(RE::IUIMessageData* data);
 	std::string constructKey(const RE::TESObjectREFR* ref) const;
-	void setPlayerNear(const RE::RefHandle& mapTarget, const bool doorAvailable, const RE::TeleportPath* const teleportPath);
+	bool isPlayerNear(const RE::PlayerCharacter* const player, const RE::ObjectRefHandle& targetHandle, const RE::TeleportPath* const teleportPath, const float requiredDistance, const bool sameInteriorCell);
 	const RE::TESWorldSpace* getRootWorldSpace(const RE::TESWorldSpace* ws);
 
 	std::vector<std::string> enumerateMapMarkers() const;
@@ -37,7 +37,7 @@ private:
 	float m_requiredQuestTargetDistance{ 25000.f };
 
 	std::vector<std::string> m_mapMarkers{};
-	bool m_isPlayerNear{ false };
+	bool m_isPlayerNearQuestTarget{ false };
 };
 
 namespace RE
@@ -48,6 +48,7 @@ namespace RE
 		ObjectRefHandle refHandle;  // 10
 		uint32_t pad14;      // 14
 	};
+
 }
 
 namespace Utils
@@ -131,11 +132,11 @@ namespace Utils
 	}
 	*/
 
-	inline RE::RefHandle& getQuestTargetPathRef(RE::RefHandle& out, RE::RefHandle& targetRefHandle, RE::TeleportPath* target, bool isSameInteriorCell, bool a5)
+	inline RE::ObjectRefHandle getMapMarkerTrackingRef(RE::ObjectRefHandle& out, RE::ObjectRefHandle& targetRefHandle, const RE::TeleportPath* target, std::uint32_t scope, bool validatePath)
 	{
-		using func_t = decltype(&getQuestTargetPathRef);
+		using func_t = decltype(&getMapMarkerTrackingRef);
 		static REL::Relocation<func_t> func{ RELOCATION_ID(52183, 53075) };
-		return func(out, targetRefHandle, target, isSameInteriorCell, a5);
+		return func(out, targetRefHandle, target, scope, validatePath);
 	}
 
 	inline bool getMaxHeightAt(RE::TESWorldSpace* worldSpace, const RE::NiPoint3& point, float& outHeight)
@@ -143,5 +144,12 @@ namespace Utils
 		using func_t = decltype(&getMaxHeightAt);
 		static REL::Relocation<func_t> func{ RELOCATION_ID(20103, 20551) };
 		return func(worldSpace, point, outHeight);
+	}
+
+	inline RE::ObjectRefHandle getTargetRef(RE::TESQuestTarget* target, RE::ObjectRefHandle& out, bool allowPickUpActor, const RE::TESQuest* quest)
+	{
+		using func_t = decltype(&getTargetRef);
+		static REL::Relocation<func_t> func{ RELOCATION_ID(24815, 25284) };
+		return func(target, out, allowPickUpActor, quest);
 	}
 }

@@ -74,7 +74,7 @@ namespace Hooks
 		}
 	};
 
-	// Remove the default to Player reference when opening the map menu.
+	// Allow the map camera center to be the middle of the map
 	struct SetMapCameraRootHook
 	{
 		static void thunk(RE::MapCamera* camera, RE::NiNode* root, const RE::NiPoint3& mapPos)
@@ -103,8 +103,8 @@ namespace Hooks
 			pos.x = (seCellX + nwCellX) * 0.5f;
 			pos.y = (seCellY + nwCellY) * 0.5f;
 
-			static bool cnoFound = REX::W32::GetModuleHandleA("FlatMapMarkersSSE.dll");
-			if (cnoFound)
+			static bool fwmfFound = REX::W32::GetModuleHandleA("FlatMapMarkersSSE.dll");
+			if (fwmfFound)
 			{
 				pos.z = 180000.0f;
 			}
@@ -166,7 +166,7 @@ namespace Hooks
 		static bool thunk(void* unk, void* someScaleformInformation, RE::NiPoint3* pos, const RE::RefHandle& currentMarkerTargetHandle, std::uint32_t markerGotoFrame)
 		{
 			const auto manager = Manager::GetSingleton();
-			if (manager->isCompassQuestTargetHidden() && !manager->isPlayerNear())
+			if (manager->isCompassQuestTargetHidden() && !manager->isPlayerNearQuestTarget())
 				return false;
 
 			return func(unk, someScaleformInformation, pos, currentMarkerTargetHandle, markerGotoFrame);
@@ -176,7 +176,7 @@ namespace Hooks
 		static bool CNOthunk()
 		{
 			const auto manager = Manager::GetSingleton();
-			if (manager->isCompassQuestTargetHidden() && !manager->isPlayerNear())
+			if (manager->isCompassQuestTargetHidden() && !manager->isPlayerNearQuestTarget())
 				return false;
 
 			return true;
