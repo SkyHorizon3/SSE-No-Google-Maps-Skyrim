@@ -75,84 +75,42 @@ namespace Hooks
 	};
 
 	// Remove the default to Player reference when opening the map menu.
-	struct MapCameraCenterHook
+	struct SetMapCameraRootHook
 	{
-		struct Patch : Xbyak::CodeGenerator
+		static void thunk(RE::MapCamera* camera, RE::NiNode* root, const RE::NiPoint3& mapPos)
 		{
-			Patch(std::uintptr_t retn, std::uintptr_t func)
+			const auto ui = RE::UI::GetSingleton();
+			const auto menu = ui ? ui->GetMenu<RE::MapMenu>().get() : nullptr;
+			const auto runtimeData = menu ? menu->GetRuntimeData2() : nullptr;
+
+			if (!menu || !runtimeData)
+				return;
+
+			if (runtimeData->cameraOpeningCenter != 0)
 			{
-				Xbyak::Label funcLabel;
-				Xbyak::Label retnLabel;
-
-				push(rcx);
-
-				mov(rcx, rdi); // map menu ptr
-				call(ptr[rip + funcLabel]); //call thunk
-
-				movss(xmm0, ptr[rax]);
-				movss(ptr[rbp - 0x49], xmm0); // x
-
-				movss(xmm1, ptr[rax + 0x4]); // y
-				movss(ptr[rbp - 0x45], xmm1);
-
-				movss(xmm0, ptr[rax + 0x8]); // z
-				movss(ptr[rbp - 0x41], xmm0);
-
-				pop(rcx);
-
-				jmp(ptr[rip + retnLabel]); //jump back to original code
-
-				L(funcLabel);
-				dq(func);
-
-				L(retnLabel);
-				dq(retn);
-			}
-		};
-
-		static RE::NiPoint3* thunk(RE::MapMenu* menu)
-		{
-			static RE::NiPoint3 result{};
-
-			if (menu && menu->GetRuntimeData2()->cameraOpeningCenter == 0)
-			{
-				const auto camera = &menu->GetRuntimeData2()->camera;
-				const auto mapData = camera->worldSpace->worldMapData;
-
-				const auto seCellX = static_cast<float>(mapData.seCellX << 12); // CellToWorldCoord
-				const auto seCellY = static_cast<float>(mapData.seCellY << 12);
-				const auto nwCellX = static_cast<float>(mapData.nwCellX << 12);
-				const auto nwCellY = static_cast<float>(mapData.nwCellY << 12);
-
-				RE::NiPoint3 pos{};
-				pos.x = (seCellX + nwCellX) * 0.5f;
-				pos.y = (seCellY + nwCellY) * 0.5f;
-
-				result = pos;
-			}
-			else
-			{
-				result = menu->GetRuntimeData2()->playerMarkerPosition; // REL::Module::IsVR() ? menu->GetVRRuntimeData2()->playerMarkerPosition :
+				func(camera, root, mapPos);
+				return;
 			}
 
-			return &result;
+			const auto mapData = camera->worldSpace->worldMapData;
+
+			const auto seCellX = static_cast<float>(mapData.seCellX << 12); // CellToWorldCoord
+			const auto seCellY = static_cast<float>(mapData.seCellY << 12);
+			const auto nwCellX = static_cast<float>(mapData.nwCellX << 12);
+			const auto nwCellY = static_cast<float>(mapData.nwCellY << 12);
+
+			RE::NiPoint3 pos{};
+			pos.x = (seCellX + nwCellX) * 0.5f;
+			pos.y = (seCellY + nwCellY) * 0.5f;
+
+			func(camera, root, pos);
 		}
-
+		static inline REL::Relocation<decltype(thunk)> func;
 
 		static void Install()
 		{
-			// Inlined in VR, need to rewrite parts for support
-			REL::Relocation<std::uintptr_t> fillAddress{ REL::VariantID(52214, 53101, 0x91B360), REL::Relocate(0x1A9, 0x1AB) };
-
-			const auto targetAddress = fillAddress.address();
-
-			REL::safe_fill(targetAddress, REL::NOP, 0x27);
-			auto code = Patch(targetAddress + 0x27, stl::unrestricted_cast<std::uintptr_t>(thunk));
-
-			auto& trampoline = SKSE::GetTrampoline();
-			auto result = trampoline.allocate(code);
-			trampoline.write_branch<5>(targetAddress, (std::uintptr_t)result);
-
+			REL::Relocation<std::uintptr_t> Vtbl{ RE::VTABLE_MapCamera[0] }; // VR wrong
+			func = Vtbl.write_vfunc(0x3, &thunk);
 		}
 	};
 
@@ -173,7 +131,7 @@ namespace Hooks
 	// Get the target ref for the quest. So we can get the distance to the player.
 	// Skyrim normally returns the next (door) reference if there are any. But we want the the marker like it's shown in the map menu.
 	// This function is always called right before the one below
-	struct GetRefHandleCompassHook
+	struct GetTrackingRefHook
 	{
 		static RE::RefHandle& thunk(RE::TESQuestTarget* questTarget, RE::RefHandle& refHandle, RE::TESQuest* quest)
 		{
@@ -289,7 +247,7 @@ namespace Hooks
 	void InstallHooks()
 	{
 		bool cnoFound = REX::W32::GetModuleHandleA("CompassNavigationOverhaul.dll");
-		size_t amount = cnoFound ? 215 : 150;
+		size_t amount = cnoFound ? 130 : 70;
 		SKSE::AllocTrampoline(amount);
 
 
@@ -307,7 +265,7 @@ namespace Hooks
 
 		MapMenuProcessMessageHook::Install();
 
-		MapCameraCenterHook::Install();
+		SetMapCameraRootHook::Install();
 
 		REL::Relocation<std::uintptr_t> compass01{ REL::VariantID(50870, 51744, 0x8B4170), REL::Relocate(0x450, 0x473, 0x468) };
 		stl::write_thunk_call<CompassHook01>(compass01.address());
@@ -315,7 +273,7 @@ namespace Hooks
 		CompassHook02::Install(cnoFound);
 
 		REL::Relocation<std::uintptr_t> refhook{ REL::VariantID(50826, 51691, 0x8B2BD0), REL::Relocate(0xFB, 0x167, 0x117) };
-		stl::write_thunk_call<GetRefHandleCompassHook>(refhook.address());
+		stl::write_thunk_call<GetTrackingRefHook>(refhook.address());
 
 		SKSE::log::info("Installed Hooks!");
 	}

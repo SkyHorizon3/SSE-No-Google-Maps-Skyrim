@@ -45,7 +45,7 @@ namespace RE
 	class RefHandleUIData : public RE::IUIMessageData
 	{
 	public:
-		uint32_t refHandle;  // 10
+		ObjectRefHandle refHandle;  // 10
 		uint32_t pad14;      // 14
 	};
 }
@@ -117,9 +117,9 @@ namespace Utils
 	}
 
 	// static REL::Relocation just for performance reasons...
-	inline RE::RefHandle getPlayerCharacterHandle()
+	inline RE::ObjectRefHandle& getPlayerCharacterHandle()
 	{
-		static REL::Relocation<RE::RefHandle*> handle{ REL::VariantID(517013, 403520, 0x2FEB9EC) };
+		static REL::Relocation<RE::ObjectRefHandle*> handle{ REL::VariantID(517013, 403520, 0x2FEB9EC) };
 		return *handle;
 	}
 
