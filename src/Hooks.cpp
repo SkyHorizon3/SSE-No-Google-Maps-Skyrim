@@ -6,7 +6,7 @@ namespace Hooks
 	// disable player map marker
 	struct PlayerMarkerHook
 	{
-		static bool thunk(RE::BSTArray<RE::MapMenuMarker>* playerMarker, RE::NiPoint3* playerMarkerPos)
+		static bool thunk(RE::BSTArray<RE::MapMenuMarker>& playerMarker, RE::NiPoint3* playerMarkerPos)
 		{
 			if (Manager::GetSingleton()->isPlayerMarkerHidden())
 				return false;
@@ -134,7 +134,8 @@ namespace Hooks
 		// function parameters different in VR
 		static bool thunk(void* unk, void* someScaleformInformation, RE::NiPoint3* pos, const RE::RefHandle& handle, std::uint32_t markerGotoFrame)
 		{
-			if (Manager::GetSingleton()->areCompassMarkersHidden())
+			const auto manager = Manager::GetSingleton();
+			if (manager->areCompassMarkersHidden() && !manager->handleCompassMarker(handle))
 				return false;
 
 			return func(unk, someScaleformInformation, pos, handle, markerGotoFrame);
@@ -147,9 +148,9 @@ namespace Hooks
 	// This function is always called right before the one below
 	struct GetTrackingRefHook
 	{
-		static RE::RefHandle& thunk(RE::TESQuestTarget* questTarget, RE::RefHandle& refHandle, RE::TESQuest* quest)
+		static RE::ObjectRefHandle& thunk(RE::TESQuestTarget* questTarget, RE::ObjectRefHandle& out, const RE::TESQuest* quest)
 		{
-			RE::RefHandle& result = func(questTarget, refHandle, quest);
+			auto& result = func(questTarget, out, quest);
 
 			//Next is some implementation of code I got from the journal menu questTargetID code, 1408EB320 for 1.5.97.
 			Manager::GetSingleton()->handleQuestTarget(questTarget, quest);

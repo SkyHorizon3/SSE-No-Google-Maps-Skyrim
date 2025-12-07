@@ -11,13 +11,13 @@ void Manager::parseINI()
 	ini.LoadFile(path.c_str());
 
 	constexpr const char* section = "General";
+	m_isPlayerMarkerHidden = ini.GetBoolValue(section, "bHidePlayerMapMarker");
+	m_hideCompassMapMarkers = ini.GetBoolValue(section, "bHideCompassMapMarkers");
+	m_hideCompassQuestTargetMarker = ini.GetBoolValue(section, "bHideCompassQuestMarker");
+	m_QuestTargetDistance = static_cast<float>(ini.GetDoubleValue(section, "fQuestTargetDistance"));
+	m_MarkerTargetDistance = static_cast<float>(ini.GetDoubleValue(section, "fMarkerTargetDistance"));
 
-	m_isPlayerMarkerHidden = ini.GetBoolValue(section, "HidePlayerMapMarker");
-	m_hideCompassMapMarkers = ini.GetBoolValue(section, "HideCompassMapMarkers");
-	m_hideCompassQuestTargetMarker = ini.GetBoolValue(section, "HideCompassQuestTargetMarker");
-	m_requiredQuestTargetDistance = static_cast<float>(ini.GetDoubleValue(section, "RequiredQuestTargetDistance"));
-
-	const auto marker = ini.GetValue(section, "MapMarkerReference");
+	const auto marker = ini.GetValue(section, "sMapMarkerReference");
 	if (!marker || *marker == '\0')
 		return;
 
@@ -43,11 +43,11 @@ void Manager::serializeINI()
 	ini.SetUnicode();
 
 	constexpr const char* section = "General";
-
-	ini.SetBoolValue(section, "HidePlayerMapMarker", m_isPlayerMarkerHidden);
-	ini.SetBoolValue(section, "HideCompassMapMarkers", m_hideCompassMapMarkers);
-	ini.SetBoolValue(section, "HideCompassQuestTargetMarker", m_hideCompassQuestTargetMarker);
-	ini.SetDoubleValue(section, "RequiredQuestTargetDistance", m_requiredQuestTargetDistance);
+	ini.SetBoolValue(section, "bHidePlayerMapMarker", m_isPlayerMarkerHidden);
+	ini.SetBoolValue(section, "bHideCompassMapMarkers", m_hideCompassMapMarkers);
+	ini.SetBoolValue(section, "bHideCompassQuestMarker", m_hideCompassQuestTargetMarker);
+	ini.SetDoubleValue(section, "fQuestTargetDistance", m_QuestTargetDistance);
+	ini.SetDoubleValue(section, "fMarkerTargetDistance", m_MarkerTargetDistance);
 
 	std::string markerString = "None";
 	if (m_marker)
@@ -57,7 +57,7 @@ void Manager::serializeINI()
 		markerString = std::format("{:08X}|{}", Utils::getTrimmedFormID(m_marker), filename);
 	}
 
-	ini.SetValue(section, "MapMarkerReference", markerString.c_str());
+	ini.SetValue(section, "sMapMarkerReference", markerString.c_str());
 	ini.SaveFile(path.c_str());
 }
 
@@ -66,22 +66,11 @@ void Manager::draw()
 	static std::string selected{};
 	bool valueChanged = false;
 
-	if (ImGui::Checkbox("Hide Player Marker", &m_isPlayerMarkerHidden))
-	{
-		valueChanged = true;
-	}
-	if (ImGui::Checkbox("Hide Compass Map Markers", &m_hideCompassMapMarkers))
-	{
-		valueChanged = true;
-	}
-	if (ImGui::Checkbox("Hide Compass Quest Target Marker", &m_hideCompassQuestTargetMarker))
-	{
-		valueChanged = true;
-	}
-	if (ImGui::InputFloat("Quest Target Marker Unlock Distance", &m_requiredQuestTargetDistance))
-	{
-		valueChanged = true;
-	}
+	valueChanged |= ImGui::Checkbox("Hide Player Marker", &m_isPlayerMarkerHidden);
+	valueChanged |= ImGui::Checkbox("Hide Compass Map Markers", &m_hideCompassMapMarkers);
+	valueChanged |= ImGui::Checkbox("Hide Compass Quest Target Marker", &m_hideCompassQuestTargetMarker);
+	valueChanged |= ImGui::InputFloat("Quest Target Marker Unlock Distance", &m_QuestTargetDistance);
+	valueChanged |= ImGui::InputFloat("Map Marker Unlock Distance", &m_MarkerTargetDistance);
 
 	if (!m_marker)
 		selected = "None";
@@ -132,13 +121,15 @@ std::string Manager::constructKey(const RE::TESObjectREFR* ref) const
 	return {};
 }
 
-bool Manager::isPlayerNear(const RE::PlayerCharacter* const player, const RE::ObjectRefHandle& targetHandle, const RE::TeleportPath* const teleportPath, const float requiredDistance, const bool sameInteriorCell)
+bool Manager::isPlayerNear(const RE::PlayerCharacter* const player, RE::TESObjectREFR* target, const RE::TeleportPath* const teleportPath, const float requiredDistance, const bool sameInteriorCell)
 {
-	const auto target = targetHandle.get();
 	if (sameInteriorCell || !target) // player is in same cell or in an cell near the target
 		return true;
 
-	if (!player || !sameInteriorCell && isParentInteriorCell(player) && teleportPath) // player is not in same interior and the target is maybe still far away
+	if (!player)
+		return false;
+
+	if (isParentInteriorCell(player) && teleportPath) // player is not in same interior and the target is maybe still far away
 	{
 		const auto& pathRefs = teleportPath->pathRefs;
 
@@ -152,29 +143,23 @@ bool Manager::isPlayerNear(const RE::PlayerCharacter* const player, const RE::Ob
 			if (!teleportLinkedDoor)
 				continue;
 
-			if (isParentInteriorCell(teleportLinkedDoor)) // skip if it's interior
+			if (isParentInteriorCell(teleportLinkedDoor)) // skip if it's another interior
 				continue;
 
-			RE::TESObjectREFR* nextRef = nullptr;
-			if (i + 1 < pathRefs.size())
-			{
-				nextRef = pathRefs[i + 1].ref;
-			}
-			else // hopefully handle cases where the target is directly in the worldspace and not in an interior again
-			{
-				nextRef = target.get();
-			}
+			auto nextRef = (i + 1 < pathRefs.size()) ? pathRefs[i + 1].ref : target;
+			if (!nextRef || nextRef->GetWorldspace() != target->GetWorldspace())
+				continue;
 
-			return nextRef && teleportLinkedDoor->GetDistance(nextRef) <= requiredDistance;
+			return teleportLinkedDoor->GetDistance(nextRef) <= requiredDistance;
 		}
 
 		return false;
 	}
 
-	return player->GetDistance(target.get()) <= requiredDistance;
+	return player->GetDistance(target) <= requiredDistance;
 }
 
-void Manager::handleQuestTarget(RE::TESQuestTarget* questTarget, RE::TESQuest* quest)
+void Manager::handleQuestTarget(RE::TESQuestTarget* questTarget, const RE::TESQuest* quest)
 {
 	RE::ObjectRefHandle finalTarget{};
 	Utils::getTargetRef(questTarget, finalTarget, true, quest); // gets the final target ref of the quest
@@ -190,10 +175,19 @@ void Manager::handleQuestTarget(RE::TESQuestTarget* questTarget, RE::TESQuest* q
 	RE::ObjectRefHandle mapTarget{};
 	Utils::getMapMarkerTrackingRef(mapTarget, finalTarget, teleportPath, scope, true); // gets the ref that is shown for the quest in the map menu atm
 
-	m_isPlayerNearQuestTarget = isPlayerNear(player, mapTarget, teleportPath, m_requiredQuestTargetDistance, sameInteriorCell);
+	m_isPlayerNearQuestTarget = isPlayerNear(player, mapTarget.get().get(), teleportPath, m_QuestTargetDistance, sameInteriorCell);
 }
 
-bool Manager::isShowingQuestTarget(RE::IUIMessageData* data)
+bool Manager::handleCompassMarker(const RE::RefHandle& handle)
+{
+	RE::TESObjectREFRPtr refPtr{};
+	if (!RE::LookupReferenceByHandle(handle, refPtr))
+		return false;
+
+	return isPlayerNear(RE::PlayerCharacter::GetSingleton(), refPtr.get(), nullptr, m_MarkerTargetDistance, false);
+}
+
+bool Manager::isShowingQuestTarget(RE::IUIMessageData* data) const
 {
 	if (!data)
 		return false;
@@ -228,13 +222,13 @@ const RE::TESWorldSpace* Manager::getRootWorldSpace(const RE::TESWorldSpace* ws)
 }
 
 // 1402ADB80 - 1.5.97
-bool Manager::isParentInteriorCell(const RE::TESObjectREFR* const a1)
+bool Manager::isParentInteriorCell(const RE::TESObjectREFR* const ref) const
 {
-	const auto parentCell = a1->parentCell;
+	const auto parentCell = ref->parentCell;
 	if (parentCell)
 		return parentCell->IsInteriorCell();
 
-	const auto saveParent = a1->GetSaveParentCell();
+	const auto saveParent = ref->GetSaveParentCell();
 	return !saveParent || saveParent->IsInteriorCell() || saveParent->GetRuntimeData().worldSpace == nullptr;
 }
 

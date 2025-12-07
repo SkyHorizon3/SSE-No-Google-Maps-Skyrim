@@ -11,16 +11,17 @@ public:
 
 	RE::RefHandle getMarkerRefHandle(const RE::PlayerCharacter* player);
 	RE::TESObjectREFR* getMarkerReference() const { return m_marker; }
-	bool isParentInteriorCell(const RE::TESObjectREFR* const ref);
-	void handleQuestTarget(RE::TESQuestTarget* questTarget, RE::TESQuest* quest);
+	bool isParentInteriorCell(const RE::TESObjectREFR* const ref) const;
+	void handleQuestTarget(RE::TESQuestTarget* questTarget, const RE::TESQuest* quest);
+	bool handleCompassMarker(const RE::RefHandle& handle);
 	void setCameraCenter(RE::MapMenu* a_menu, RE::UIMessage& a_message);
 
 	void draw();
 
 private:
-	bool isShowingQuestTarget(RE::IUIMessageData* data);
+	bool isShowingQuestTarget(RE::IUIMessageData* data) const;
 	std::string constructKey(const RE::TESObjectREFR* ref) const;
-	bool isPlayerNear(const RE::PlayerCharacter* const player, const RE::ObjectRefHandle& targetHandle, const RE::TeleportPath* const teleportPath, const float requiredDistance, const bool sameInteriorCell);
+	bool isPlayerNear(const RE::PlayerCharacter* const player, RE::TESObjectREFR* target, const RE::TeleportPath* const teleportPath, const float requiredDistance, const bool sameInteriorCell);
 	const RE::TESWorldSpace* getRootWorldSpace(const RE::TESWorldSpace* ws);
 
 	std::vector<std::string> enumerateMapMarkers() const;
@@ -34,7 +35,8 @@ private:
 	bool m_isPlayerMarkerHidden{ true };
 	bool m_hideCompassMapMarkers{ true };
 	bool m_hideCompassQuestTargetMarker{ true };
-	float m_requiredQuestTargetDistance{ 25000.f };
+	float m_QuestTargetDistance{ 25000.f };
+	float m_MarkerTargetDistance{ 25000.f };
 
 	std::vector<std::string> m_mapMarkers{};
 	bool m_isPlayerNearQuestTarget{ false };
@@ -132,7 +134,7 @@ namespace Utils
 	}
 	*/
 
-	inline RE::ObjectRefHandle getMapMarkerTrackingRef(RE::ObjectRefHandle& out, RE::ObjectRefHandle& targetRefHandle, const RE::TeleportPath* target, std::uint32_t scope, bool validatePath)
+	inline RE::ObjectRefHandle& getMapMarkerTrackingRef(RE::ObjectRefHandle& out, RE::ObjectRefHandle& targetRefHandle, const RE::TeleportPath* target, std::uint32_t scope, bool validatePath)
 	{
 		using func_t = decltype(&getMapMarkerTrackingRef);
 		static REL::Relocation<func_t> func{ RELOCATION_ID(52183, 53075) };
@@ -146,7 +148,7 @@ namespace Utils
 		return func(worldSpace, point, outHeight);
 	}
 
-	inline RE::ObjectRefHandle getTargetRef(RE::TESQuestTarget* target, RE::ObjectRefHandle& out, bool allowPickUpActor, const RE::TESQuest* quest)
+	inline RE::ObjectRefHandle& getTargetRef(RE::TESQuestTarget* target, RE::ObjectRefHandle& out, bool allowPickUpActor, const RE::TESQuest* quest)
 	{
 		using func_t = decltype(&getTargetRef);
 		static REL::Relocation<func_t> func{ RELOCATION_ID(24815, 25284) };
