@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(NoGoogleMapsSkyrim VERSION 0.2.0 LANGUAGES CXX)
+project(NoGoogleMapsSkyrim VERSION 0.3.1 LANGUAGES CXX)
 
 # Set your project version and specify C++ standard
 set(CMAKE_CXX_STANDARD 23)

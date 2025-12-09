@@ -262,7 +262,7 @@ namespace Hooks
 	void InstallHooks()
 	{
 		bool cnoFound = REX::W32::GetModuleHandleA("CompassNavigationOverhaul.dll");
-		size_t amount = cnoFound ? 130 : 70;
+		size_t amount = cnoFound ? 140 : 70;
 		SKSE::AllocTrampoline(amount);
 
 
