@@ -1,17 +1,10 @@
 {
   "name": "nogooglemapsskyrim",
-  "version-string": "0.3.1",
+  "version-string": "0.4.0",
   "description": "NoGoogleMapsSkyrim",
-  "license": "GPL-3.0",
   "dependencies": [
     "commonlibsse-ng",
     "simpleini"
   ],
-  "builtin-baseline": "cd1099f42a3c2ee28dc68e3db3f6f88658982736",
-  "overrides": [
-    {
-      "name": "xbyak",
-      "version": "7.23.1"
-    }
-  ]
+  "builtin-baseline": "32305df7d0b9a308e6ac454dd98ebfe550342c09"
 }

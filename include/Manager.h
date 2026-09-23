@@ -20,7 +20,7 @@ public:
 
 private:
 	bool isShowingQuestTarget(RE::IUIMessageData* data) const;
-	std::string constructKey(const RE::TESObjectREFR* ref) const;
+	std::string constructKey(RE::TESObjectREFR* const ref) const;
 	bool isPlayerNear(const RE::PlayerCharacter* const player, RE::TESObjectREFR* target, const RE::TeleportPath* const teleportPath, const float requiredDistance, const bool sameInteriorCell);
 	const RE::TESWorldSpace* getRootWorldSpace(const RE::TESWorldSpace* ws);
 
@@ -41,17 +41,6 @@ private:
 	std::vector<std::string> m_mapMarkers{};
 	bool m_isPlayerNearQuestTarget{ false };
 };
-
-namespace RE
-{
-	class RefHandleUIData : public RE::IUIMessageData
-	{
-	public:
-		ObjectRefHandle refHandle;  // 10
-		uint32_t pad14;      // 14
-	};
-
-}
 
 namespace Utils
 {
@@ -119,7 +108,6 @@ namespace Utils
 		return formID;
 	}
 
-	// static REL::Relocation just for performance reasons...
 	inline RE::ObjectRefHandle& getPlayerCharacterHandle()
 	{
 		static REL::Relocation<RE::ObjectRefHandle*> handle{ REL::VariantID(517013, 403520, 0x2FEB9EC) };
@@ -139,19 +127,5 @@ namespace Utils
 		using func_t = decltype(&getMapMarkerTrackingRef);
 		static REL::Relocation<func_t> func{ RELOCATION_ID(52183, 53075) };
 		return func(out, targetRefHandle, target, scope, validatePath);
-	}
-
-	inline bool getMaxHeightAt(RE::TESWorldSpace* worldSpace, const RE::NiPoint3& point, float& outHeight)
-	{
-		using func_t = decltype(&getMaxHeightAt);
-		static REL::Relocation<func_t> func{ RELOCATION_ID(20103, 20551) };
-		return func(worldSpace, point, outHeight);
-	}
-
-	inline RE::ObjectRefHandle& getTargetRef(RE::TESQuestTarget* target, RE::ObjectRefHandle& out, bool allowPickUpActor, const RE::TESQuest* quest)
-	{
-		using func_t = decltype(&getTargetRef);
-		static REL::Relocation<func_t> func{ RELOCATION_ID(24815, 25284) };
-		return func(target, out, allowPickUpActor, quest);
 	}
 }

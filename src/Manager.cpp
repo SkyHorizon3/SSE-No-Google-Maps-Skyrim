@@ -89,7 +89,6 @@ void Manager::draw()
 		else
 		{
 			const auto first = selected.substr(0, firstSep);
-
 			const size_t secondSep = selected.find('|', firstSep + 1);
 			const auto second = selected.substr(firstSep + 1, secondSep - firstSep - 1);
 
@@ -103,21 +102,29 @@ void Manager::draw()
 	}
 }
 
-std::string Manager::constructKey(const RE::TESObjectREFR* ref) const
+std::string Manager::constructKey(RE::TESObjectREFR* const ref) const
 {
 	if (!ref)
 		return {};
+
+	const auto formatStr = [&](const RE::TESObjectREFR* ref, const char* name) -> std::string
+		{
+			const auto file = ref->GetFile(0);
+			const auto filename = file ? file->GetFilename() : "";
+			return std::format("{:08X}|{}|{}", Utils::getTrimmedFormID(ref), filename, name);
+		};
+
+	if (ref->IsPlayerRef())
+	{
+		return formatStr(ref, ref->GetDisplayFullName());
+	}
 
 	const auto marker = ref ? ref->extraList.GetByType<RE::ExtraMapMarker>() : nullptr;
 	if (marker && marker->mapData)
 	{
 		const auto markerName = marker->mapData->locationName.GetFullName();
-		const auto file = ref->GetFile(0);
-		std::string_view filename = file ? file->GetFilename() : ""sv;
-
-		return std::format("{:08X}|{}|{}", Utils::getTrimmedFormID(ref), filename, markerName);
+		return formatStr(ref, markerName);
 	}
-
 	return {};
 }
 
@@ -131,7 +138,7 @@ bool Manager::isPlayerNear(const RE::PlayerCharacter* const player, RE::TESObjec
 
 	if (isParentInteriorCell(player) && teleportPath) // player is not in same interior and the target is maybe still far away
 	{
-		const auto& pathRefs = teleportPath->pathRefs;
+		const auto& pathRefs = teleportPath->teleportRefs;
 
 		for (std::uint32_t i = 0; i < pathRefs.size(); i++)
 		{
@@ -161,18 +168,17 @@ bool Manager::isPlayerNear(const RE::PlayerCharacter* const player, RE::TESObjec
 
 void Manager::handleQuestTarget(RE::TESQuestTarget* questTarget, const RE::TESQuest* quest)
 {
-	RE::ObjectRefHandle finalTarget{};
-	Utils::getTargetRef(questTarget, finalTarget, true, quest); // gets the final target ref of the quest
+	RE::ObjectRefHandle finalTarget;
+	questTarget->GetTargetRef(finalTarget, true, quest); // gets the final target ref of the quest
 
 	const auto target = finalTarget.get();
-
 	const auto player = RE::PlayerCharacter::GetSingleton();
 	const bool sameInteriorCell = target && player && isParentInteriorCell(player) && target->parentCell == player->parentCell;
 
 	std::uint32_t scope = sameInteriorCell ? 1 : 0; // 1 = local, 0 = world
 	const auto teleportPath = &questTarget->teleportPath;
 
-	RE::ObjectRefHandle mapTarget{};
+	RE::ObjectRefHandle mapTarget;
 	Utils::getMapMarkerTrackingRef(mapTarget, finalTarget, teleportPath, scope, true); // gets the ref that is shown for the quest in the map menu atm
 
 	m_isPlayerNearQuestTarget = isPlayerNear(player, mapTarget.get().get(), teleportPath, m_QuestTargetDistance, sameInteriorCell);
@@ -196,21 +202,18 @@ bool Manager::isShowingQuestTarget(RE::IUIMessageData* data) const
 	if (!handleData)
 		return false;
 
-	return handleData->refHandle != Utils::getPlayerCharacterHandle();
+	return handleData->data != Utils::getPlayerCharacterHandle().native_handle();
 }
 
 void Manager::setCameraCenter(RE::MapMenu* a_menu, RE::UIMessage& a_message)
 {
 	const auto player = RE::PlayerCharacter::GetSingleton();
 
+	// TODO: this isParentInteriorCell check needs to be removed I think
 	if (!isParentInteriorCell(player) && !isShowingQuestTarget(a_message.data))
 	{
 		const auto handle = getMarkerRefHandle(player);
-
-		//if (REL::Module::IsVR())
-		//	a_menu->GetVRRuntimeData2()->cameraOpeningCenter = handle;
-		//else
-		a_menu->GetRuntimeData2()->cameraOpeningCenter = handle;
+		a_menu->GetRuntimeData2()->cameraRootRef = handle;
 	}
 }
 
@@ -237,6 +240,9 @@ RE::RefHandle Manager::getMarkerRefHandle(const RE::PlayerCharacter* player)
 	if (!m_marker || !player)
 		return 0;
 
+	if (m_marker->IsPlayerRef())
+		return Utils::getPlayerCharacterHandle().native_handle();
+
 	const auto playerWS = player->GetWorldspace();
 	if (!playerWS)
 		return 0;
@@ -248,19 +254,15 @@ RE::RefHandle Manager::getMarkerRefHandle(const RE::PlayerCharacter* player)
 	if (getRootWorldSpace(markerWs) != getRootWorldSpace(playerWS))
 		return 0;
 
-	RE::RefHandle handle{};
-	RE::CreateRefHandle(handle, m_marker);
-
-	return handle;
+	return m_marker->CreateRefHandle().native_handle();
 }
 
 std::vector<std::string> Manager::enumerateMapMarkers() const
 {
-	const auto& [map, lock] = RE::TESForm::GetAllForms();
-	[[maybe_unused]] const RE::BSReadLockGuard l{ lock };
-
 	std::vector<std::string> markerVec{};
 
+	const auto& [map, lock] = RE::TESForm::GetAllForms();
+	[[maybe_unused]] const RE::BSReadLockGuard l{ lock };
 	if (!map)
 		return markerVec;
 
@@ -287,10 +289,10 @@ std::vector<std::string> Manager::enumerateMapMarkers() const
 
 bool Manager::createCombo(const char* label, std::string& currentItem, std::vector<std::string>& items, ImGuiComboFlags_ flags)
 {
-	ImGuiStyle& style = ImGui::GetStyle();
-	float w = 500.0f;
-	float spacing = style.ItemInnerSpacing.x;
-	float button_sz = ImGui::GetFrameHeight();
+	const auto& style = ImGui::GetStyle();
+	constexpr float w = 500.0f;
+	const float spacing = style.ItemInnerSpacing.x;
+	const float button_sz = ImGui::GetFrameHeight();
 	ImGui::PushItemWidth(w - spacing - button_sz * 2.0f);
 
 	bool itemChanged = false;

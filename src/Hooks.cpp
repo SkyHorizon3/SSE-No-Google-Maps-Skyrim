@@ -83,37 +83,34 @@ namespace Hooks
 			const auto menu = ui ? ui->GetMenu<RE::MapMenu>() : nullptr;
 			const auto runtimeData = menu ? menu->GetRuntimeData2() : nullptr;
 
-			if (!menu || !runtimeData)
-				return;
-
-			if (runtimeData->cameraOpeningCenter != 0)
+			const auto ws = camera ? camera->worldSpace : nullptr;
+			if (!menu || !runtimeData || !ws || runtimeData->cameraRootRef != 0)
 			{
 				func(camera, root, mapPos);
 				return;
 			}
 
-			const auto mapData = camera->worldSpace->worldMapData;
-
+			const auto mapData = ws->worldMapData;
 			const auto seCellX = static_cast<float>(mapData.seCellX << 12); // CellToWorldCoord
 			const auto seCellY = static_cast<float>(mapData.seCellY << 12);
 			const auto nwCellX = static_cast<float>(mapData.nwCellX << 12);
 			const auto nwCellY = static_cast<float>(mapData.nwCellY << 12);
 
-			RE::NiPoint3 pos{};
-			pos.x = (seCellX + nwCellX) * 0.5f;
-			pos.y = (seCellY + nwCellY) * 0.5f;
+			const auto x = (seCellX + nwCellX) * 0.5f;
+			const auto y = (seCellX + nwCellX) * 0.5f;
+			RE::NiPoint3 pos{ x ,y, 0.0f };
 
-			static bool fwmfFound = REX::W32::GetModuleHandleA("FlatMapMarkersSSE.dll");
+			static const bool fwmfFound = REX::W32::GetModuleHandleA("FlatMapMarkersSSE.dll");
 			if (fwmfFound)
 			{
 				pos.z = 180000.0f;
 			}
 			else
 			{
-				float maxHeight{};
-				if (Utils::getMaxHeightAt(camera->worldSpace, pos, maxHeight))
+				float height{};
+				if (ws->GetMaxHeightAt(pos, height))
 				{
-					pos.z = maxHeight;
+					pos.z = height;
 				}
 			}
 
@@ -191,9 +188,7 @@ namespace Hooks
 				Xbyak::Label funcLabel;
 				Xbyak::Label cnoLabel;
 				Xbyak::Label skipLabel;
-
 				Xbyak::Label doCno;
-				Xbyak::Label doSkip;
 
 				push(rcx);
 				push(rdx);
@@ -212,15 +207,11 @@ namespace Hooks
 				pop(rcx);
 
 				jnz(doCno);
-				jmp(doSkip);
+				jmp(ptr[rip + skipLabel]);
 
 				// execute cno code
 				L(doCno);
 				jmp(ptr[rip + cnoLabel]);
-
-				// skip over cno code, use our return value (false)
-				L(doSkip);
-				jmp(ptr[rip + skipLabel]);
 
 				L(funcLabel);
 				dq(cnoFunc);
@@ -247,8 +238,7 @@ namespace Hooks
 				auto code = CNOPatch(absolute, targetAddress + 0x5, stl::unrestricted_cast<std::uintptr_t>(CNOthunk));
 
 				auto& trampoline = SKSE::GetTrampoline();
-				auto result = trampoline.allocate(code);
-				trampoline.write_branch<5>(targetAddress, (std::uintptr_t)result);
+				trampoline.write_branch<5>(targetAddress, trampoline.allocate(code));
 
 				SKSE::log::info("Installed compatibility for Compass Navigation Overhaul!");
 			}
@@ -262,6 +252,8 @@ namespace Hooks
 	void InstallHooks()
 	{
 		bool cnoFound = REX::W32::GetModuleHandleA("CompassNavigationOverhaul.dll");
+		const bool ae2 = REL::Module::get().version() >= SKSE::RUNTIME_SSE_1_7_99;
+
 		size_t amount = cnoFound ? 140 : 70;
 		SKSE::AllocTrampoline(amount);
 
@@ -275,7 +267,7 @@ namespace Hooks
 		REL::Relocation<std::uintptr_t> loc2{ REL::VariantID(52215, 53102, 0x916D10), REL::Relocate(0x55D, 0x58F, 0xA82) };
 		stl::write_thunk_call<CurrentLocationReturnHook>(loc2.address());
 
-		REL::Relocation<std::uintptr_t> loc3{ REL::VariantID(52215, 53102, 0x916D10), REL::Relocate(0x63B, 0x66D, 0xC61) };
+		REL::Relocation<std::uintptr_t> loc3{ REL::VariantID(52215, 53102, 0x916D10), REL::Relocate(0x63B, ae2 ? 0x67E : 0x66D, 0xC61) };
 		stl::write_thunk_call<CurrentLocationReturnHook>(loc3.address());
 
 		MapMenuProcessMessageHook::Install();
