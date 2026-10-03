@@ -1,15 +1,22 @@
 #pragma once
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include "RE/Skyrim.h"
 #include "SKSE/SKSE.h"
 #include "REX/REX/Singleton.h"
 
-using namespace std::literals;
-
 #include "Plugin.h"
 
+#include <ClibUtil/string.hpp>
 #include <xbyak/xbyak.h>
 #include <SimpleIni.h>
+
+namespace string = clib_util::string;
+
+using namespace std::literals;
+using namespace clib_util::string::literals;
 
 namespace stl
 {
@@ -51,35 +58,6 @@ namespace stl
 
 			T::func = a_src + 7 + disp; // address + lea size + displacement
 		}
-	}
-
-	// Thanks Nukem and po3 for this!
-	template <class T, std::size_t BYTES>
-	void hook_function_prologue(std::uintptr_t a_src)
-	{
-		struct Patch : Xbyak::CodeGenerator
-		{
-			Patch(std::uintptr_t a_originalFuncAddr, std::size_t a_originalByteLength)
-			{
-				// Hook returns here. Execute the restored bytes and jump back to the original function.
-				for (size_t i = 0; i < a_originalByteLength; i++)
-					db(*reinterpret_cast<uint8_t*>(a_originalFuncAddr + i));
-
-				jmp(ptr[rip]);
-				dq(a_originalFuncAddr + a_originalByteLength);
-			}
-		};
-
-		Patch p(a_src, BYTES);
-		p.ready();
-
-		auto& trampoline = SKSE::GetTrampoline();
-		trampoline.write_branch<5>(a_src, T::thunk);
-
-		auto alloc = trampoline.allocate(p.getSize());
-		std::memcpy(alloc, p.getCode(), p.getSize());
-
-		T::func = reinterpret_cast<std::uintptr_t>(alloc);
 	}
 }
 

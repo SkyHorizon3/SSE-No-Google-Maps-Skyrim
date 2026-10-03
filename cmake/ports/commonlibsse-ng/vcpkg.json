@@ -1,6 +1,6 @@
 {
   "name": "commonlibsse-ng",
-  "version": "9.0.1",
+  "version": "10.1.0",
   "port-version": 0,
   "description": "A fork of CommonLibSSE with advanced features for modern SKSE development.",
   "homepage": "https://github.com/alandtse/CommonLibVR/tree/ng",

@@ -1,4 +1,5 @@
 #include "Manager.h"
+#include "Utils.h"
 
 void Manager::parseINI()
 {
@@ -29,10 +30,9 @@ void Manager::parseINI()
 		return;
 	}
 
-	const RE::FormID formID = std::stoul(markerString.substr(0, separatorPos), nullptr, 16);
+	const RE::FormID formID = string::to_num<RE::FormID>(markerString.substr(0, separatorPos), true);
 	const std::string plugin = markerString.substr(separatorPos + 1);
-
-	m_marker = RE::TESDataHandler::GetSingleton()->LookupForm<RE::TESObjectREFR>(formID, plugin);
+	m_marker = lookupRef(formID, plugin);
 }
 
 void Manager::serializeINI()
@@ -52,9 +52,7 @@ void Manager::serializeINI()
 	std::string markerString = "None";
 	if (m_marker)
 	{
-		const auto file = m_marker->GetFile(0);
-		std::string_view filename = file ? file->GetFilename() : ""sv;
-		markerString = std::format("{:08X}|{}", Utils::getTrimmedFormID(m_marker), filename);
+		markerString = std::format("{:08X}|{}", Utils::getTrimmedFormID(m_marker), Utils::getModName(m_marker));
 	}
 
 	ini.SetValue(section, "sMapMarkerReference", markerString.c_str());
@@ -90,9 +88,10 @@ void Manager::draw()
 		{
 			const auto first = selected.substr(0, firstSep);
 			const size_t secondSep = selected.find('|', firstSep + 1);
-			const auto second = selected.substr(firstSep + 1, secondSep - firstSep - 1);
 
-			m_marker = RE::TESDataHandler::GetSingleton()->LookupForm<RE::TESObjectREFR>(std::stoul(first, nullptr, 16), second);
+			const auto plugin = selected.substr(firstSep + 1, secondSep - firstSep - 1);
+			const auto formID = string::to_num<RE::FormID>(first, true);
+			m_marker = lookupRef(formID, plugin);
 		}
 	}
 
@@ -109,14 +108,12 @@ std::string Manager::constructKey(RE::TESObjectREFR* const ref) const
 
 	const auto formatStr = [&](const RE::TESObjectREFR* ref, const char* name) -> std::string
 		{
-			const auto file = ref->GetFile(0);
-			const auto filename = file ? file->GetFilename() : "";
-			return std::format("{:08X}|{}|{}", Utils::getTrimmedFormID(ref), filename, name);
+			return std::format("{:08X}|{}|{}", Utils::getTrimmedFormID(ref), Utils::getModName(ref), name);
 		};
 
 	if (ref->IsPlayerRef())
 	{
-		return formatStr(ref, ref->GetDisplayFullName());
+		return formatStr(ref, "PlayerRef");
 	}
 
 	const auto marker = ref ? ref->extraList.GetByType<RE::ExtraMapMarker>() : nullptr;
@@ -186,7 +183,7 @@ void Manager::handleQuestTarget(RE::TESQuestTarget* questTarget, const RE::TESQu
 
 bool Manager::handleCompassMarker(const RE::RefHandle& handle)
 {
-	RE::TESObjectREFRPtr refPtr{};
+	RE::TESObjectREFRPtr refPtr;
 	if (!RE::LookupReferenceByHandle(handle, refPtr))
 		return false;
 
@@ -210,7 +207,8 @@ void Manager::setCameraCenter(RE::MapMenu* a_menu, RE::UIMessage& a_message)
 	const auto player = RE::PlayerCharacter::GetSingleton();
 
 	// TODO: this isParentInteriorCell check needs to be removed I think
-	if (!isParentInteriorCell(player) && !isShowingQuestTarget(a_message.data))
+	// !isParentInteriorCell(player) && 
+	if (!isShowingQuestTarget(a_message.data))
 	{
 		const auto handle = getMarkerRefHandle(player);
 		a_menu->GetRuntimeData2()->cameraRootRef = handle;
@@ -260,13 +258,13 @@ RE::RefHandle Manager::getMarkerRefHandle(const RE::PlayerCharacter* player)
 std::vector<std::string> Manager::enumerateMapMarkers() const
 {
 	std::vector<std::string> markerVec{};
+	markerVec.emplace_back("None");
+	markerVec.emplace_back(constructKey(RE::PlayerCharacter::GetSingleton()));
 
 	const auto& [map, lock] = RE::TESForm::GetAllForms();
 	[[maybe_unused]] const RE::BSReadLockGuard l{ lock };
 	if (!map)
 		return markerVec;
-
-	markerVec.emplace_back("None");
 
 	for (const auto& [formID, form] : *map)
 	{
@@ -323,4 +321,19 @@ bool Manager::createCombo(const char* label, std::string& currentItem, std::vect
 	ImGui::PopItemWidth();
 
 	return itemChanged;
+}
+
+RE::TESObjectREFR* Manager::lookupRef(const RE::FormID formID, const std::string_view plugin) const
+{
+	const auto player = RE::PlayerCharacter::GetSingleton();
+	if (player && formID == player->GetFormID())
+	{
+		return player;
+	}
+
+	if (const auto handler = RE::TESDataHandler::GetSingleton())
+	{
+		return handler->LookupForm<RE::TESObjectREFR>(formID, plugin);
+	}
+	return nullptr;
 }

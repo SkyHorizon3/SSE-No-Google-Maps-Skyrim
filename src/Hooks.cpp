@@ -97,7 +97,7 @@ namespace Hooks
 			const auto nwCellY = static_cast<float>(mapData.nwCellY << 12);
 
 			const auto x = (seCellX + nwCellX) * 0.5f;
-			const auto y = (seCellX + nwCellX) * 0.5f;
+			const auto y = (seCellY + nwCellY) * 0.5f;
 			RE::NiPoint3 pos{ x ,y, 0.0f };
 
 			static const bool fwmfFound = REX::W32::GetModuleHandleA("FlatMapMarkersSSE.dll");
