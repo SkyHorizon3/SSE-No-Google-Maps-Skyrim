@@ -190,31 +190,6 @@ bool Manager::handleCompassMarker(const RE::RefHandle& handle)
 	return isPlayerNear(RE::PlayerCharacter::GetSingleton(), refPtr.get(), nullptr, m_MarkerTargetDistance, false);
 }
 
-bool Manager::isShowingQuestTarget(RE::IUIMessageData* data) const
-{
-	if (!data)
-		return false;
-
-	const auto handleData = static_cast<RE::RefHandleUIData*>(data);
-	if (!handleData)
-		return false;
-
-	return handleData->data != Utils::getPlayerCharacterHandle().native_handle();
-}
-
-void Manager::setCameraCenter(RE::MapMenu* a_menu, RE::UIMessage& a_message)
-{
-	const auto player = RE::PlayerCharacter::GetSingleton();
-
-	// TODO: this isParentInteriorCell check needs to be removed I think
-	// !isParentInteriorCell(player) && 
-	if (!isShowingQuestTarget(a_message.data))
-	{
-		const auto handle = getMarkerRefHandle(player);
-		a_menu->GetRuntimeData2()->cameraRootRef = handle;
-	}
-}
-
 const RE::TESWorldSpace* Manager::getRootWorldSpace(const RE::TESWorldSpace* ws)
 {
 	while (ws && ws->parentWorld)
@@ -233,26 +208,53 @@ bool Manager::isParentInteriorCell(const RE::TESObjectREFR* const ref) const
 	return !saveParent || saveParent->IsInteriorCell() || saveParent->GetRuntimeData().worldSpace == nullptr;
 }
 
-RE::RefHandle Manager::getMarkerRefHandle(const RE::PlayerCharacter* player)
+RE::NiPoint3 Manager::getMiddleOfMap(RE::TESWorldSpace* const ws)
 {
+	const auto mapData = ws->worldMapData;
+	const auto seCellX = static_cast<float>(mapData.seCellX << 12); // CellToWorldCoord
+	const auto seCellY = static_cast<float>(mapData.seCellY << 12);
+	const auto nwCellX = static_cast<float>(mapData.nwCellX << 12);
+	const auto nwCellY = static_cast<float>(mapData.nwCellY << 12);
+
+	const auto x = (seCellX + nwCellX) * 0.5f;
+	const auto y = (seCellY + nwCellY) * 0.5f;
+	RE::NiPoint3 pos{ x ,y, 0.0f };
+
+	static const bool fwmfFound = REX::W32::GetModuleHandleA("FlatMapMarkersSSE.dll");
+	if (fwmfFound)
+	{
+		pos.z = 180000.0f;
+	}
+	else
+	{
+		float height{};
+		if (ws->GetMaxHeightAt(pos, height))
+		{
+			pos.z = height;
+		}
+	}
+
+	return pos;
+}
+
+RE::NiPoint3 Manager::getMarkerPosition(RE::TESWorldSpace* const worldspace, RE::MapMenu::RUNTIME_DATA2* runtimeData)
+{
+	const auto player = RE::PlayerCharacter::GetSingleton();
 	if (!m_marker || !player)
-		return 0;
+		return getMiddleOfMap(worldspace);
 
 	if (m_marker->IsPlayerRef())
-		return Utils::getPlayerCharacterHandle().native_handle();
+		return runtimeData->playerMarkerPosition;
 
 	const auto playerWS = player->GetWorldspace();
-	if (!playerWS)
-		return 0;
-
 	const auto markerWs = m_marker->GetWorldspace();
-	if (!markerWs)
-		return 0;
+	if (!playerWS || !markerWs)
+		return getMiddleOfMap(worldspace);
 
 	if (getRootWorldSpace(markerWs) != getRootWorldSpace(playerWS))
-		return 0;
+		return getMiddleOfMap(worldspace);
 
-	return m_marker->CreateRefHandle().native_handle();
+	return m_marker->GetPosition();
 }
 
 std::vector<std::string> Manager::enumerateMapMarkers() const

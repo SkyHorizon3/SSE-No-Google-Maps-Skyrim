@@ -1,5 +1,6 @@
 #include "Hooks.h"
 #include "Manager.h"
+#include "Utils.h"
 
 namespace Hooks
 {
@@ -13,28 +14,11 @@ namespace Hooks
 
 			return func(playerMarker, playerMarkerPos);
 		};
-
-		/*
-		static bool thunkVR(RE::BSTArray<RE::MapMenuMarker>* playerMarker, RE::NiPoint3* playerMarkerPos, RE::NiPoint3* unk)
-		{
-			if (Manager::GetSingleton()->isPlayerMarkerHidden())
-				return false;
-
-			return funcVR(playerMarker, playerMarkerPos, unk);
-		};
-		*/
-
 		static inline REL::Relocation<decltype(thunk)> func;
-		//static inline REL::Relocation<decltype(thunkVR)> funcVR;
 
 		static void Install()
 		{
 			REL::Relocation<std::uintptr_t> markerHook{ REL::VariantID(52221, 53108, 0x9184C0), REL::Relocate(0x121,0x121,0x124) };
-
-			//if (REL::Module::IsVR())
-			//funcVR = SKSE::GetTrampoline().write_call<5>(markerHook.address(), thunkVR);
-			//else
-
 			func = SKSE::GetTrampoline().write_call<5>(markerHook.address(), thunk);
 		}
 	};
@@ -52,28 +36,6 @@ namespace Hooks
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
 
-	struct MapMenuProcessMessageHook
-	{
-		static RE::UI_MESSAGE_RESULTS thunk(RE::MapMenu* a_menu, RE::UIMessage& a_message)
-		{
-			auto result = func(a_menu, a_message);
-
-			if (!a_menu || a_message.type != RE::UI_MESSAGE_TYPE::kShow)
-				return result;
-
-			Manager::GetSingleton()->setCameraCenter(a_menu, a_message);
-
-			return result;
-		}
-		static inline REL::Relocation<decltype(thunk)> func;
-
-		static void Install()
-		{
-			REL::Relocation<std::uintptr_t> Vtbl{ RE::VTABLE_MapMenu[0] };
-			func = Vtbl.write_vfunc(0x4, &thunk);
-		}
-	};
-
 	// Allow the map camera center to be the middle of the map
 	struct SetMapCameraRootHook
 	{
@@ -84,36 +46,13 @@ namespace Hooks
 			const auto runtimeData = menu ? menu->GetRuntimeData2() : nullptr;
 
 			const auto ws = camera ? camera->worldSpace : nullptr;
-			if (!menu || !runtimeData || !ws || runtimeData->cameraRootRef != 0)
+			if (!menu || !runtimeData || !ws || runtimeData->cameraRootRef != Utils::getPlayerCharacterHandle().native_handle())
 			{
 				func(camera, root, mapPos);
 				return;
 			}
 
-			const auto mapData = ws->worldMapData;
-			const auto seCellX = static_cast<float>(mapData.seCellX << 12); // CellToWorldCoord
-			const auto seCellY = static_cast<float>(mapData.seCellY << 12);
-			const auto nwCellX = static_cast<float>(mapData.nwCellX << 12);
-			const auto nwCellY = static_cast<float>(mapData.nwCellY << 12);
-
-			const auto x = (seCellX + nwCellX) * 0.5f;
-			const auto y = (seCellY + nwCellY) * 0.5f;
-			RE::NiPoint3 pos{ x ,y, 0.0f };
-
-			static const bool fwmfFound = REX::W32::GetModuleHandleA("FlatMapMarkersSSE.dll");
-			if (fwmfFound)
-			{
-				pos.z = 180000.0f;
-			}
-			else
-			{
-				float height{};
-				if (ws->GetMaxHeightAt(pos, height))
-				{
-					pos.z = height;
-				}
-			}
-
+			const auto pos = Manager::GetSingleton()->getMarkerPosition(ws, runtimeData);
 			func(camera, root, pos);
 		}
 		static inline REL::Relocation<decltype(thunk)> func;
@@ -254,9 +193,8 @@ namespace Hooks
 		bool cnoFound = REX::W32::GetModuleHandleA("CompassNavigationOverhaul.dll");
 		const bool ae2 = REL::Module::get().version() >= SKSE::RUNTIME_SSE_1_7_99;
 
-		size_t amount = cnoFound ? 140 : 70;
+		const size_t amount = cnoFound ? 140 : 70;
 		SKSE::AllocTrampoline(amount);
-
 
 		PlayerMarkerHook::Install();
 
@@ -269,8 +207,6 @@ namespace Hooks
 
 		REL::Relocation<std::uintptr_t> loc3{ REL::VariantID(52215, 53102, 0x916D10), REL::Relocate(0x63B, ae2 ? 0x67E : 0x66D, 0xC61) };
 		stl::write_thunk_call<CurrentLocationReturnHook>(loc3.address());
-
-		MapMenuProcessMessageHook::Install();
 
 		SetMapCameraRootHook::Install();
 

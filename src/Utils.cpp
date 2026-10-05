@@ -8,6 +8,12 @@ namespace Utils
 		return *handle;
 	}
 
+	/*RE::ObjectRefHandle& getPlayerMarkerHandle()
+	{
+		static REL::Relocation<RE::ObjectRefHandle*> handle{ REL::VariantID(520103, 406633, 0x0) };
+		return *handle;
+	}*/
+
 	RE::ObjectRefHandle& getMapMarkerTrackingRef(RE::ObjectRefHandle& out, RE::ObjectRefHandle& targetRefHandle, const RE::TeleportPath* target, std::uint32_t scope, bool validatePath)
 	{
 		using func_t = decltype(&getMapMarkerTrackingRef);

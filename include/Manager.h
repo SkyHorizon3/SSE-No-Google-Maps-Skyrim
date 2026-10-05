@@ -9,20 +9,18 @@ public:
 	bool isCompassQuestTargetHidden() const noexcept { return m_hideCompassQuestTargetMarker; }
 	bool isPlayerNearQuestTarget() const noexcept { return m_isPlayerNearQuestTarget; }
 
-	RE::RefHandle getMarkerRefHandle(const RE::PlayerCharacter* player);
-	RE::TESObjectREFR* getMarkerReference() const { return m_marker; }
+	RE::NiPoint3 getMarkerPosition(RE::TESWorldSpace* const worldspace, RE::MapMenu::RUNTIME_DATA2* runtimeData);
 	bool isParentInteriorCell(const RE::TESObjectREFR* const ref) const;
 	void handleQuestTarget(RE::TESQuestTarget* questTarget, const RE::TESQuest* quest);
 	bool handleCompassMarker(const RE::RefHandle& handle);
-	void setCameraCenter(RE::MapMenu* a_menu, RE::UIMessage& a_message);
 
 	void draw();
 
 private:
-	bool isShowingQuestTarget(RE::IUIMessageData* data) const;
 	std::string constructKey(RE::TESObjectREFR* const ref) const;
 	bool isPlayerNear(const RE::PlayerCharacter* const player, RE::TESObjectREFR* target, const RE::TeleportPath* const teleportPath, const float requiredDistance, const bool sameInteriorCell);
 	const RE::TESWorldSpace* getRootWorldSpace(const RE::TESWorldSpace* ws);
+	RE::NiPoint3 getMiddleOfMap(RE::TESWorldSpace* const ws);
 
 	std::vector<std::string> enumerateMapMarkers() const;
 
@@ -30,7 +28,6 @@ private:
 	RE::TESObjectREFR* lookupRef(const RE::FormID formID, const std::string_view plugin) const;
 
 	void serializeINI();
-
 
 	// INI
 	RE::TESObjectREFR* m_marker{ nullptr };
