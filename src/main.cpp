@@ -31,7 +31,7 @@ void MessageListener(SKSE::MessagingInterface::Message* message)
 	case SKSE::MessagingInterface::kDataLoaded:
 	{
 		Load();
-		Manager::GetSingleton()->parseINI();
+		Manager::GetSingleton()->onDataLoaded();
 	}
 	break;
 
