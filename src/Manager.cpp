@@ -1,6 +1,12 @@
 #include "Manager.h"
 #include "Utils.h"
 
+void Manager::onDataLoaded()
+{
+	parseINI();
+	m_fwmfFound = REX::W32::GetModuleHandleA("FlatMapMarkersSSE.dll");
+}
+
 void Manager::parseINI()
 {
 	m_mapMarkers = enumerateMapMarkers();
@@ -61,7 +67,6 @@ void Manager::serializeINI()
 
 void Manager::draw()
 {
-	static std::string selected{};
 	bool valueChanged = false;
 
 	valueChanged |= ImGui::Checkbox("Hide Player Marker", &m_isPlayerMarkerHidden);
@@ -71,25 +76,25 @@ void Manager::draw()
 	valueChanged |= ImGui::InputFloat("Map Marker Unlock Distance", &m_MarkerTargetDistance);
 
 	if (!m_marker)
-		selected = "None";
+		m_selectedMarkerStr = "None";
 	else
-		selected = constructKey(m_marker);
+		m_selectedMarkerStr = constructKey(m_marker);
 
-	if (createCombo("Select Marker", selected, m_mapMarkers, ImGuiComboFlags_None))
+	if (createCombo("Select Marker", m_selectedMarkerStr, m_mapMarkers, ImGuiComboFlags_None))
 	{
 		valueChanged = true;
 
-		const size_t firstSep = selected.find('|');
+		const size_t firstSep = m_selectedMarkerStr.find('|');
 		if (firstSep == std::string::npos)
 		{
 			m_marker = nullptr;
 		}
 		else
 		{
-			const auto first = selected.substr(0, firstSep);
-			const size_t secondSep = selected.find('|', firstSep + 1);
+			const auto first = m_selectedMarkerStr.substr(0, firstSep);
+			const size_t secondSep = m_selectedMarkerStr.find('|', firstSep + 1);
 
-			const auto plugin = selected.substr(firstSep + 1, secondSep - firstSep - 1);
+			const auto plugin = m_selectedMarkerStr.substr(firstSep + 1, secondSep - firstSep - 1);
 			const auto formID = string::to_num<RE::FormID>(first, true);
 			m_marker = lookupRef(formID, plugin);
 		}
@@ -220,8 +225,7 @@ RE::NiPoint3 Manager::getMiddleOfMap(RE::TESWorldSpace* const ws)
 	const auto y = (seCellY + nwCellY) * 0.5f;
 	RE::NiPoint3 pos{ x ,y, 0.0f };
 
-	static const bool fwmfFound = REX::W32::GetModuleHandleA("FlatMapMarkersSSE.dll");
-	if (fwmfFound)
+	if (m_fwmfFound)
 	{
 		pos.z = 180000.0f;
 	}

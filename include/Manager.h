@@ -3,7 +3,7 @@
 class Manager : public REX::Singleton<Manager>
 {
 public:
-	void parseINI();
+	void onDataLoaded();
 	bool isPlayerMarkerHidden() const noexcept { return m_isPlayerMarkerHidden; }
 	bool areCompassMarkersHidden() const noexcept { return m_hideCompassMapMarkers; }
 	bool isCompassQuestTargetHidden() const noexcept { return m_hideCompassQuestTargetMarker; }
@@ -27,6 +27,7 @@ private:
 	bool createCombo(const char* label, std::string& currentItem, std::vector<std::string>& items, ImGuiComboFlags_ flags);
 	RE::TESObjectREFR* lookupRef(const RE::FormID formID, const std::string_view plugin) const;
 
+	void parseINI();
 	void serializeINI();
 
 	// INI
@@ -34,8 +35,10 @@ private:
 	bool m_isPlayerMarkerHidden{ true };
 	bool m_hideCompassMapMarkers{ true };
 	bool m_hideCompassQuestTargetMarker{ true };
+	bool m_fwmfFound{ false };
 	float m_QuestTargetDistance{ 25000.f };
 	float m_MarkerTargetDistance{ 25000.f };
+	std::string m_selectedMarkerStr;
 
 	std::vector<std::string> m_mapMarkers{};
 	bool m_isPlayerNearQuestTarget{ false };
